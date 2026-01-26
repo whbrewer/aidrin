@@ -125,4 +125,20 @@ def celery_init_app(app: Flask) -> Celery:
     return celery_app
 
 
-__all__ = ["create_app", "celery_init_app"]
+def get_headless_api():
+    from .headless.api import (
+        get_metric_info,
+        list_available_metrics,
+        run_batch_metrics,
+        run_metric,
+    )
+
+    return {
+        "run_metric": run_metric,
+        "run_batch_metrics": run_batch_metrics,
+        "list_available_metrics": list_available_metrics,
+        "get_metric_info": get_metric_info,
+    }
+
+
+__all__ = ["create_app", "celery_init_app", "get_headless_api"]

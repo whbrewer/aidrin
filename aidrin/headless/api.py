@@ -1,0 +1,386 @@
+import base64
+import os
+import re
+from typing import Any, Dict, List, Optional
+
+from .config import HeadlessConfig
+from .runners import (
+    run_class_imbalance,
+    run_completeness,
+    run_correlations,
+    run_differential_privacy,
+    run_duplicity,
+    run_entropy_risk,
+    run_feature_relevance,
+    run_k_anonymity,
+    run_l_diversity,
+    run_multiple_attribute_risk,
+    run_outliers,
+    run_representation_rate,
+    run_single_attribute_risk,
+    run_statistical_rates,
+    run_t_closeness,
+)
+
+
+METRIC_REGISTRY: Dict[str, Dict[str, Any]] = {
+    "completeness": {
+        "category": "data_quality",
+        "description": "Column completeness scores and overall completeness.",
+        "runner": run_completeness,
+        "required_args": [],
+    },
+    "duplicity": {
+        "category": "data_quality",
+        "description": "Dataset duplicity ratio.",
+        "runner": run_duplicity,
+        "required_args": [],
+    },
+    "outliers": {
+        "category": "data_quality",
+        "description": "Outlier proportions for numerical columns.",
+        "runner": run_outliers,
+        "required_args": [],
+    },
+    "correlations": {
+        "category": "correlation",
+        "description": "Categorical and numerical correlation matrices.",
+        "runner": run_correlations,
+        "required_args": ["columns"],
+    },
+    "feature_relevance": {
+        "category": "correlation",
+        "description": "Feature relevance to target using Pearson correlation.",
+        "runner": run_feature_relevance,
+        "required_args": ["cat_columns", "num_columns", "target_column"],
+    },
+    "class_imbalance": {
+        "category": "fairness",
+        "description": "Class imbalance degree and distribution plot.",
+        "runner": run_class_imbalance,
+        "required_args": ["target_column"],
+    },
+    "statistical_rates": {
+        "category": "fairness",
+        "description": "Statistical rates across sensitive groups.",
+        "runner": run_statistical_rates,
+        "required_args": ["y_true_column", "sensitive_attribute_column"],
+    },
+    "representation_rate": {
+        "category": "fairness",
+        "description": "Representation rate ratios for categorical values.",
+        "runner": run_representation_rate,
+        "required_args": ["columns"],
+    },
+    "k_anonymity": {
+        "category": "privacy",
+        "description": "k-anonymity score and histogram.",
+        "runner": run_k_anonymity,
+        "required_args": ["quasi_identifiers"],
+    },
+    "l_diversity": {
+        "category": "privacy",
+        "description": "l-diversity score and histogram.",
+        "runner": run_l_diversity,
+        "required_args": ["quasi_identifiers", "sensitive_column"],
+    },
+    "t_closeness": {
+        "category": "privacy",
+        "description": "t-closeness score and histogram.",
+        "runner": run_t_closeness,
+        "required_args": ["quasi_identifiers", "sensitive_column"],
+    },
+    "entropy_risk": {
+        "category": "privacy",
+        "description": "Entropy risk score and histogram.",
+        "runner": run_entropy_risk,
+        "required_args": ["quasi_identifiers"],
+    },
+    "single_attribute_risk": {
+        "category": "privacy",
+        "description": "Single attribute Markov-model risk scores.",
+        "runner": run_single_attribute_risk,
+        "required_args": ["id_column", "eval_columns"],
+    },
+    "multiple_attribute_risk": {
+        "category": "privacy",
+        "description": "Multiple attribute Markov-model risk scores.",
+        "runner": run_multiple_attribute_risk,
+        "required_args": ["id_column", "eval_columns"],
+    },
+    "differential_privacy": {
+        "category": "privacy",
+        "description": "Differential privacy noise injection statistics.",
+        "runner": run_differential_privacy,
+        "required_args": ["columns", "epsilon"],
+    },
+}
+
+
+def _normalize_list(value: Optional[Any]) -> Optional[List[str]]:
+    if value is None:
+        return None
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    if isinstance(value, str):
+        return [item.strip() for item in value.split(",") if item.strip()]
+    return [str(value).strip()]
+
+
+def list_available_metrics(category: Optional[str] = None) -> List[Dict[str, Any]]:
+    results = []
+    for name, meta in METRIC_REGISTRY.items():
+        if category and meta["category"] != category:
+            continue
+        results.append(
+            {
+                "name": name,
+                "category": meta["category"],
+                "description": meta["description"],
+                "required_args": list(meta.get("required_args", [])),
+            }
+        )
+    return results
+
+
+def get_metric_info(name: str) -> Dict[str, Any]:
+    metric = METRIC_REGISTRY.get(name)
+    if not metric:
+        raise ValueError(f"Unknown metric: {name}")
+    return {
+        "name": name,
+        "category": metric["category"],
+        "description": metric["description"],
+        "required_args": list(metric.get("required_args", [])),
+    }
+
+
+def _safe_slug(value: str) -> str:
+    value = value.strip().lower().replace(" ", "_")
+    value = re.sub(r"[^a-z0-9_.-]+", "_", value)
+    return value.strip("_") or "image"
+
+
+def _maybe_save_images(
+    metric_name: str,
+    result: Any,
+    save_images: bool,
+    image_dir: Optional[str],
+) -> Any:
+    if not save_images or not isinstance(result, dict):
+        return result
+
+    target_dir = image_dir or os.path.join("/tmp", "aidrin_images")
+    os.makedirs(target_dir, exist_ok=True)
+
+    updated: Dict[str, Any] = {}
+    for key, value in result.items():
+        if (
+            isinstance(value, str)
+            and "visualization" in key.lower()
+            and value.strip()
+        ):
+            filename = f"{_safe_slug(metric_name)}_{_safe_slug(key)}.png"
+            path = os.path.join(target_dir, filename)
+            try:
+                with open(path, "wb") as handle:
+                    handle.write(base64.b64decode(value))
+                updated[key] = path
+            except Exception:
+                updated[key] = value
+        else:
+            updated[key] = value
+    return updated
+
+
+def run_metric(
+    metric_name: str,
+    file_path: str,
+    file_type: Optional[str] = None,
+    file_name: Optional[str] = None,
+    save_images: bool = True,
+    image_dir: Optional[str] = None,
+    **kwargs: Any,
+) -> Dict[str, Any]:
+    metric_key = metric_name.strip().lower()
+    metric = METRIC_REGISTRY.get(metric_key)
+    if not metric:
+        raise ValueError(f"Unknown metric: {metric_name}")
+
+    if metric_key in {"completeness", "duplicity", "outliers"}:
+        result = metric["runner"](file_path, file_type, file_name)
+        return _maybe_save_images(metric_key, result, save_images, image_dir)
+
+    if metric_key == "correlations":
+        columns = _normalize_list(kwargs.get("columns"))
+        if not columns:
+            raise ValueError("columns is required for correlations")
+        result = metric["runner"](file_path, file_type, file_name, columns)
+        return _maybe_save_images(metric_key, result, save_images, image_dir)
+
+    if metric_key == "feature_relevance":
+        cat_columns = _normalize_list(kwargs.get("cat_columns")) or []
+        num_columns = _normalize_list(kwargs.get("num_columns")) or []
+        target_column = kwargs.get("target_column")
+        if not target_column:
+            raise ValueError("target_column is required for feature_relevance")
+        if not cat_columns and not num_columns:
+            raise ValueError("cat_columns or num_columns must be provided")
+        result = metric["runner"](
+            file_path, file_type, file_name, cat_columns, num_columns, target_column
+        )
+        return _maybe_save_images(metric_key, result, save_images, image_dir)
+
+    if metric_key == "class_imbalance":
+        target_column = kwargs.get("target_column")
+        if not target_column:
+            raise ValueError("target_column is required for class_imbalance")
+        distance_metric = kwargs.get("distance_metric")
+        result = metric["runner"](
+            file_path, file_type, file_name, target_column, distance_metric
+        )
+        return _maybe_save_images(metric_key, result, save_images, image_dir)
+
+    if metric_key == "statistical_rates":
+        y_true_column = kwargs.get("y_true_column") or kwargs.get("target_column")
+        sensitive_attribute_column = (
+            kwargs.get("sensitive_attribute_column") or kwargs.get("sensitive_column")
+        )
+        if not y_true_column or not sensitive_attribute_column:
+            raise ValueError(
+                "y_true_column and sensitive_attribute_column are required for statistical_rates"
+            )
+        result = metric["runner"](
+            file_path,
+            file_type,
+            file_name,
+            y_true_column,
+            sensitive_attribute_column,
+        )
+        return _maybe_save_images(metric_key, result, save_images, image_dir)
+
+    if metric_key == "representation_rate":
+        columns = _normalize_list(kwargs.get("columns"))
+        if not columns:
+            raise ValueError("columns is required for representation_rate")
+        result = metric["runner"](file_path, file_type, file_name, columns)
+        return _maybe_save_images(metric_key, result, save_images, image_dir)
+
+    if metric_key in {"k_anonymity", "entropy_risk"}:
+        quasi_identifiers = _normalize_list(kwargs.get("quasi_identifiers"))
+        if not quasi_identifiers:
+            raise ValueError("quasi_identifiers is required")
+        result = metric["runner"](file_path, file_type, file_name, quasi_identifiers)
+        return _maybe_save_images(metric_key, result, save_images, image_dir)
+
+    if metric_key in {"l_diversity", "t_closeness"}:
+        quasi_identifiers = _normalize_list(kwargs.get("quasi_identifiers"))
+        sensitive_column = kwargs.get("sensitive_column")
+        if not quasi_identifiers or not sensitive_column:
+            raise ValueError("quasi_identifiers and sensitive_column are required")
+        result = metric["runner"](
+            file_path, file_type, file_name, quasi_identifiers, sensitive_column
+        )
+        return _maybe_save_images(metric_key, result, save_images, image_dir)
+
+    if metric_key in {"single_attribute_risk", "multiple_attribute_risk"}:
+        id_column = kwargs.get("id_column")
+        eval_columns = _normalize_list(kwargs.get("eval_columns"))
+        if not id_column or not eval_columns:
+            raise ValueError("id_column and eval_columns are required")
+        result = metric["runner"](
+            file_path, file_type, file_name, id_column, eval_columns
+        )
+        return _maybe_save_images(metric_key, result, save_images, image_dir)
+
+    if metric_key == "differential_privacy":
+        columns = _normalize_list(kwargs.get("columns"))
+        epsilon = kwargs.get("epsilon")
+        if not columns or epsilon is None:
+            raise ValueError("columns and epsilon are required for differential_privacy")
+        result = metric["runner"](file_path, file_type, file_name, columns, epsilon)
+        return _maybe_save_images(metric_key, result, save_images, image_dir)
+
+    raise ValueError(f"Unsupported metric: {metric_name}")
+
+
+def run_batch_metrics(config: Any) -> Dict[str, Any]:
+    if isinstance(config, dict):
+        config_obj = HeadlessConfig.from_dict(config)
+    elif isinstance(config, HeadlessConfig):
+        config_obj = config
+    else:
+        raise ValueError("config must be a HeadlessConfig or dict")
+
+    metrics = config_obj.metrics or []
+    if not metrics:
+        raise ValueError("metrics must be provided for batch runs")
+
+    payload = {
+        "columns": config_obj.columns,
+        "target_column": config_obj.target_column,
+        "quasi_identifiers": config_obj.quasi_identifiers,
+        "sensitive_column": config_obj.sensitive_column,
+        "epsilon": config_obj.epsilon,
+        "id_column": config_obj.id_column,
+        "eval_columns": config_obj.eval_columns,
+        "distance_metric": config_obj.distance_metric,
+        "cat_columns": config_obj.cat_columns,
+        "num_columns": config_obj.num_columns,
+        "y_true_column": config_obj.y_true_column,
+        "sensitive_attribute_column": config_obj.sensitive_attribute_column,
+        "save_images": bool(config_obj.save_images) if config_obj.save_images is not None else True,
+        "image_dir": config_obj.image_dir,
+    }
+
+    results: Dict[str, Any] = {}
+    for metric_name in metrics:
+        results[metric_name] = run_metric(
+            metric_name,
+            config_obj.file_path,
+            file_type=config_obj.file_type,
+            file_name=config_obj.file_name,
+            **payload,
+        )
+    return results
+
+
+def run_all_data_quality(
+    file_path: str,
+    file_type: Optional[str] = None,
+    file_name: Optional[str] = None,
+) -> Dict[str, Any]:
+    return run_batch_metrics(
+        HeadlessConfig(
+            file_path=file_path,
+            file_type=file_type,
+            file_name=file_name,
+            metrics=["completeness", "duplicity", "outliers"],
+        )
+    )
+
+
+def run_privacy_assessment(
+    file_path: str,
+    file_type: Optional[str] = None,
+    file_name: Optional[str] = None,
+    **kwargs: Any,
+) -> Dict[str, Any]:
+    config = HeadlessConfig(
+        file_path=file_path,
+        file_type=file_type,
+        file_name=file_name,
+        metrics=[
+            "k_anonymity",
+            "l_diversity",
+            "t_closeness",
+            "entropy_risk",
+            "single_attribute_risk",
+            "multiple_attribute_risk",
+            "differential_privacy",
+        ],
+    )
+    for key, value in kwargs.items():
+        if hasattr(config, key):
+            setattr(config, key, value)
+    return run_batch_metrics(config)

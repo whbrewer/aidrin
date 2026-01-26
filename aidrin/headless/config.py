@@ -1,0 +1,59 @@
+import json
+from dataclasses import asdict, dataclass, field
+from typing import Any, Dict, List, Optional
+
+
+def _normalize_list(value: Optional[Any]) -> Optional[List[str]]:
+    if value is None:
+        return None
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    if isinstance(value, str):
+        return [item.strip() for item in value.split(",") if item.strip()]
+    return [str(value).strip()]
+
+
+@dataclass
+class HeadlessConfig:
+    file_path: str
+    file_type: Optional[str] = None
+    file_name: Optional[str] = None
+    metrics: Optional[List[str]] = field(default_factory=list)
+    columns: Optional[List[str]] = field(default_factory=list)
+    target_column: Optional[str] = None
+    quasi_identifiers: Optional[List[str]] = field(default_factory=list)
+    sensitive_column: Optional[str] = None
+    epsilon: Optional[float] = None
+    id_column: Optional[str] = None
+    eval_columns: Optional[List[str]] = field(default_factory=list)
+    distance_metric: Optional[str] = None
+    cat_columns: Optional[List[str]] = field(default_factory=list)
+    num_columns: Optional[List[str]] = field(default_factory=list)
+    y_true_column: Optional[str] = None
+    sensitive_attribute_column: Optional[str] = None
+    save_images: Optional[bool] = None
+    image_dir: Optional[str] = None
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "HeadlessConfig":
+        normalized = dict(data or {})
+        for key in (
+            "metrics",
+            "columns",
+            "quasi_identifiers",
+            "eval_columns",
+            "cat_columns",
+            "num_columns",
+        ):
+            if key in normalized:
+                normalized[key] = _normalize_list(normalized[key])
+        return cls(**normalized)
+
+    @classmethod
+    def from_json_file(cls, path: str) -> "HeadlessConfig":
+        with open(path, "r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+        return cls.from_dict(payload)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
