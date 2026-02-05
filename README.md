@@ -11,33 +11,45 @@ AIDRIN includes a headless mode for programmatic/CLI usage without the web inter
 ### CLI Usage
 
 ```bash
-# List available metrics
-python -m aidrin.headless.cli list
+# Quick data quality assessment (recommended)
+aidrin data-quality /path/to/data.csv
+aidrin data-quality /path/to/data.csv -v  # verbose output with timing
 
-# List metrics by category
-python -m aidrin.headless.cli list --category data_quality
+# List available metrics
+aidrin list
+aidrin list --category data_quality
 
 # Run a single metric
-python -m aidrin.headless.cli run <metric_name> <file_path>
+aidrin run <metric_name> <file_path>
 
 # Examples
-python -m aidrin.headless.cli run completeness /path/to/data.csv
-python -m aidrin.headless.cli run duplicity /path/to/data.csv
-python -m aidrin.headless.cli run outliers /path/to/data.csv
+aidrin run completeness /path/to/data.csv
+aidrin run duplicity /path/to/data.csv -v
+aidrin run outliers /path/to/data.csv --no-viz  # strip visualization data
 
-# Run with options
-python -m aidrin.headless.cli run class_imbalance /path/to/data.csv --target-column label
-python -m aidrin.headless.cli run k_anonymity /path/to/data.csv --quasi-identifiers "age,zipcode,gender"
+# Run with metric-specific options
+aidrin run class_imbalance /path/to/data.csv --target-column label
+aidrin run k_anonymity /path/to/data.csv --quasi-identifiers "age,zipcode,gender"
 
 # Run batch metrics from config
-python -m aidrin.headless.cli batch config.json
+aidrin batch config.json -v
 ```
+
+**CLI Options:**
+- `-v, --verbose` - Show progress and timing for each metric
+- `--no-viz` - Strip visualization data from output (faster, smaller output)
+- `--no-save-images` - Don't save visualization images to disk
 
 ### Python API
 
 ```python
-from aidrin.headless import run_metric, list_available_metrics, run_batch_metrics
+from aidrin.headless import run_metric, run_data_quality, list_available_metrics
 from aidrin.headless.config import HeadlessConfig
+
+# Quick data quality assessment (recommended)
+result = run_data_quality('/path/to/data.csv', verbose=True)
+print(result)
+# {'completeness': {...}, 'duplicity': {...}, 'outliers': {...}}
 
 # List available metrics
 metrics = list_available_metrics()
@@ -45,7 +57,7 @@ for m in metrics:
     print(f"{m['name']} ({m['category']}): {m['description']}")
 
 # Run a single metric
-result = run_metric('completeness', '/path/to/data.csv', save_images=False)
+result = run_metric('completeness', '/path/to/data.csv', verbose=True, strip_visualizations=True)
 print(result)
 # {'Completeness scores': {'col1': 1.0, 'col2': 0.95, ...}, 'Overall Completeness': 0.98}
 
@@ -54,7 +66,7 @@ config = HeadlessConfig(
     file_path='/path/to/data.csv',
     metrics=['completeness', 'duplicity', 'outliers'],
 )
-results = run_batch_metrics(config)
+results = run_batch_metrics(config, verbose=True, strip_visualizations=True)
 ```
 
 ### Available Metrics
@@ -90,16 +102,23 @@ results = run_batch_metrics(config)
 
 AIDRIN headless mode can be used to validate REDI pipeline outputs:
 
+```bash
+# Assess data quality before and after REDI processing
+aidrin data-quality input_data.csv -v
+# Run REDI: redi run input_data.csv
+aidrin data-quality output/train.npz -v
+```
+
 ```python
-from aidrin.headless import run_metric
+from aidrin.headless import run_data_quality
 
 # Assess input data quality before REDI processing
-input_result = run_metric('completeness', 'input_data.csv', save_images=False)
-print(f"Input completeness: {input_result['Overall Completeness']}")
+input_result = run_data_quality('input_data.csv', verbose=True)
+print(f"Input completeness: {input_result['completeness']['Overall Completeness']}")
 
 # Run REDI pipeline...
 
 # Assess output data quality after REDI processing
-output_result = run_metric('completeness', 'output/train.npz', save_images=False)
-print(f"Output completeness: {output_result['Overall Completeness']}")
+output_result = run_data_quality('output/train.npz', verbose=True)
+print(f"Output completeness: {output_result['completeness']['Overall Completeness']}")
 ```
