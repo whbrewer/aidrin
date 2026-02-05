@@ -1,6 +1,8 @@
 import base64
 import os
 import re
+import sys
+import time
 from typing import Any, Dict, List, Optional
 
 from .config import HeadlessConfig
@@ -161,6 +163,24 @@ def _safe_slug(value: str) -> str:
     return value.strip("_") or "image"
 
 
+def _strip_visualizations(result: Any) -> Any:
+    """Recursively strip visualization data from results."""
+    if isinstance(result, dict):
+        return {
+            k: _strip_visualizations(v)
+            for k, v in result.items()
+            if "visualization" not in k.lower()
+        }
+    return result
+
+
+def _log_progress(message: str, verbose: bool) -> None:
+    """Print progress message if verbose mode is enabled."""
+    if verbose:
+        sys.stderr.write(f"[aidrin] {message}\n")
+        sys.stderr.flush()
+
+
 def _maybe_save_images(
     metric_name: str,
     result: Any,
@@ -200,6 +220,8 @@ def run_metric(
     file_name: Optional[str] = None,
     save_images: bool = True,
     image_dir: Optional[str] = None,
+    verbose: bool = False,
+    strip_visualizations: bool = False,
     **kwargs: Any,
 ) -> Dict[str, Any]:
     metric_key = metric_name.strip().lower()
@@ -207,16 +229,33 @@ def run_metric(
     if not metric:
         raise ValueError(f"Unknown metric: {metric_name}")
 
+    _log_progress(f"Running {metric_key}...", verbose)
+    start_time = time.time()
+
     if metric_key in {"completeness", "duplicity", "outliers"}:
         result = metric["runner"](file_path, file_type, file_name)
-        return _maybe_save_images(metric_key, result, save_images, image_dir)
+        result = _maybe_save_images(metric_key, result, save_images, image_dir)
+        if strip_visualizations:
+            result = _strip_visualizations(result)
+        elapsed = time.time() - start_time
+        _log_progress(f"  {metric_key} completed in {elapsed:.2f}s", verbose)
+        return result
+
+    def _finalize(result: Dict[str, Any]) -> Dict[str, Any]:
+        """Apply post-processing: save images and strip visualizations."""
+        result = _maybe_save_images(metric_key, result, save_images, image_dir)
+        if strip_visualizations:
+            result = _strip_visualizations(result)
+        elapsed = time.time() - start_time
+        _log_progress(f"  {metric_key} completed in {elapsed:.2f}s", verbose)
+        return result
 
     if metric_key == "correlations":
         columns = _normalize_list(kwargs.get("columns"))
         if not columns:
             raise ValueError("columns is required for correlations")
         result = metric["runner"](file_path, file_type, file_name, columns)
-        return _maybe_save_images(metric_key, result, save_images, image_dir)
+        return _finalize(result)
 
     if metric_key == "feature_relevance":
         cat_columns = _normalize_list(kwargs.get("cat_columns")) or []
@@ -229,7 +268,7 @@ def run_metric(
         result = metric["runner"](
             file_path, file_type, file_name, cat_columns, num_columns, target_column
         )
-        return _maybe_save_images(metric_key, result, save_images, image_dir)
+        return _finalize(result)
 
     if metric_key == "class_imbalance":
         target_column = kwargs.get("target_column")
@@ -239,7 +278,7 @@ def run_metric(
         result = metric["runner"](
             file_path, file_type, file_name, target_column, distance_metric
         )
-        return _maybe_save_images(metric_key, result, save_images, image_dir)
+        return _finalize(result)
 
     if metric_key == "statistical_rates":
         y_true_column = kwargs.get("y_true_column") or kwargs.get("target_column")
@@ -257,21 +296,21 @@ def run_metric(
             y_true_column,
             sensitive_attribute_column,
         )
-        return _maybe_save_images(metric_key, result, save_images, image_dir)
+        return _finalize(result)
 
     if metric_key == "representation_rate":
         columns = _normalize_list(kwargs.get("columns"))
         if not columns:
             raise ValueError("columns is required for representation_rate")
         result = metric["runner"](file_path, file_type, file_name, columns)
-        return _maybe_save_images(metric_key, result, save_images, image_dir)
+        return _finalize(result)
 
     if metric_key in {"k_anonymity", "entropy_risk"}:
         quasi_identifiers = _normalize_list(kwargs.get("quasi_identifiers"))
         if not quasi_identifiers:
             raise ValueError("quasi_identifiers is required")
         result = metric["runner"](file_path, file_type, file_name, quasi_identifiers)
-        return _maybe_save_images(metric_key, result, save_images, image_dir)
+        return _finalize(result)
 
     if metric_key in {"l_diversity", "t_closeness"}:
         quasi_identifiers = _normalize_list(kwargs.get("quasi_identifiers"))
@@ -281,7 +320,7 @@ def run_metric(
         result = metric["runner"](
             file_path, file_type, file_name, quasi_identifiers, sensitive_column
         )
-        return _maybe_save_images(metric_key, result, save_images, image_dir)
+        return _finalize(result)
 
     if metric_key in {"single_attribute_risk", "multiple_attribute_risk"}:
         id_column = kwargs.get("id_column")
@@ -291,7 +330,7 @@ def run_metric(
         result = metric["runner"](
             file_path, file_type, file_name, id_column, eval_columns
         )
-        return _maybe_save_images(metric_key, result, save_images, image_dir)
+        return _finalize(result)
 
     if metric_key == "differential_privacy":
         columns = _normalize_list(kwargs.get("columns"))
@@ -299,12 +338,16 @@ def run_metric(
         if not columns or epsilon is None:
             raise ValueError("columns and epsilon are required for differential_privacy")
         result = metric["runner"](file_path, file_type, file_name, columns, epsilon)
-        return _maybe_save_images(metric_key, result, save_images, image_dir)
+        return _finalize(result)
 
     raise ValueError(f"Unsupported metric: {metric_name}")
 
 
-def run_batch_metrics(config: Any) -> Dict[str, Any]:
+def run_batch_metrics(
+    config: Any,
+    verbose: bool = False,
+    strip_visualizations: bool = False,
+) -> Dict[str, Any]:
     if isinstance(config, dict):
         config_obj = HeadlessConfig.from_dict(config)
     elif isinstance(config, HeadlessConfig):
@@ -315,6 +358,8 @@ def run_batch_metrics(config: Any) -> Dict[str, Any]:
     metrics = config_obj.metrics or []
     if not metrics:
         raise ValueError("metrics must be provided for batch runs")
+
+    _log_progress(f"Running {len(metrics)} metrics on {config_obj.file_path}", verbose)
 
     payload = {
         "columns": config_obj.columns,
@@ -331,6 +376,8 @@ def run_batch_metrics(config: Any) -> Dict[str, Any]:
         "sensitive_attribute_column": config_obj.sensitive_attribute_column,
         "save_images": bool(config_obj.save_images) if config_obj.save_images is not None else True,
         "image_dir": config_obj.image_dir,
+        "verbose": verbose,
+        "strip_visualizations": strip_visualizations,
     }
 
     results: Dict[str, Any] = {}
@@ -345,19 +392,33 @@ def run_batch_metrics(config: Any) -> Dict[str, Any]:
     return results
 
 
-def run_all_data_quality(
+def run_data_quality(
     file_path: str,
     file_type: Optional[str] = None,
     file_name: Optional[str] = None,
+    verbose: bool = False,
+    strip_visualizations: bool = True,
 ) -> Dict[str, Any]:
+    """Run fast data quality metrics (completeness, duplicity, outliers).
+
+    This is the recommended function for quick data quality assessment.
+    Visualizations are stripped by default for faster output.
+    """
     return run_batch_metrics(
         HeadlessConfig(
             file_path=file_path,
             file_type=file_type,
             file_name=file_name,
             metrics=["completeness", "duplicity", "outliers"],
-        )
+            save_images=False,
+        ),
+        verbose=verbose,
+        strip_visualizations=strip_visualizations,
     )
+
+
+# Alias for backwards compatibility
+run_all_data_quality = run_data_quality
 
 
 def run_privacy_assessment(

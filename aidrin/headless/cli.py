@@ -3,7 +3,7 @@ import json
 import sys
 from typing import List, Optional
 
-from .api import list_available_metrics, run_batch_metrics, run_metric
+from .api import list_available_metrics, run_batch_metrics, run_data_quality, run_metric
 from .config import HeadlessConfig
 
 
@@ -35,6 +35,8 @@ def _build_run_kwargs(args: argparse.Namespace) -> dict:
         "sensitive_attribute_column": args.sensitive_attribute_column,
         "save_images": args.save_images,
         "image_dir": args.image_dir,
+        "verbose": getattr(args, "verbose", False),
+        "strip_visualizations": getattr(args, "no_viz", False),
     }
 
 
@@ -56,6 +58,8 @@ def _configure_common_run_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--no-save-images", dest="save_images", action="store_false")
     parser.set_defaults(save_images=True)
     parser.add_argument("--image-dir", default=None)
+    parser.add_argument("-v", "--verbose", action="store_true", help="Show progress output")
+    parser.add_argument("--no-viz", action="store_true", help="Strip visualization data from output")
 
 
 def main() -> None:
@@ -72,6 +76,14 @@ def main() -> None:
 
     batch_parser = subparsers.add_parser("batch", help="Run metrics from config JSON")
     batch_parser.add_argument("config_path")
+    batch_parser.add_argument("-v", "--verbose", action="store_true", help="Show progress output")
+    batch_parser.add_argument("--no-viz", action="store_true", help="Strip visualization data from output")
+
+    # Fast data quality command
+    dq_parser = subparsers.add_parser("data-quality", help="Run fast data quality metrics (completeness, duplicity, outliers)")
+    dq_parser.add_argument("file_path")
+    dq_parser.add_argument("--file-type", dest="file_type", default=None)
+    dq_parser.add_argument("-v", "--verbose", action="store_true", help="Show progress output")
 
     args = parser.parse_args()
 
@@ -92,7 +104,21 @@ def main() -> None:
 
         if args.command == "batch":
             config = HeadlessConfig.from_json_file(args.config_path)
-            result = run_batch_metrics(config)
+            result = run_batch_metrics(
+                config,
+                verbose=args.verbose,
+                strip_visualizations=args.no_viz,
+            )
+            _dump_result(result)
+            return
+
+        if args.command == "data-quality":
+            result = run_data_quality(
+                args.file_path,
+                file_type=args.file_type,
+                verbose=args.verbose,
+                strip_visualizations=True,
+            )
             _dump_result(result)
             return
     except Exception as exc:
