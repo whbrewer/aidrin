@@ -2,6 +2,9 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+# Signal metrics to skip chart generation in headless mode
+os.environ.setdefault("AIDRIN_HEADLESS", "1")
+
 from aidrin.file_handling.file_parser import read_file
 from aidrin.structured_data_metrics.add_noise import return_noisy_stats
 from aidrin.structured_data_metrics.class_imbalance import (
