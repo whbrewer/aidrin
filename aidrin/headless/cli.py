@@ -19,6 +19,51 @@ def _dump_result(result: object) -> None:
     sys.stdout.write("\n")
 
 
+def _summarize_data_quality(result: dict) -> None:
+    """Print a compact summary of data quality results."""
+    # Completeness
+    comp = result.get("completeness", {})
+    overall_comp = comp.get("Overall Completeness", "N/A")
+    scores = comp.get("Completeness scores", {})
+    n_features = len(scores)
+    if scores:
+        vals = list(scores.values())
+        min_comp = min(vals)
+        incomplete = sum(1 for v in vals if v < 1.0)
+    else:
+        min_comp = "N/A"
+        incomplete = 0
+
+    # Duplicity
+    dup = result.get("duplicity", {})
+    dup_scores = dup.get("Duplicity scores", {})
+    dup_ratio = dup_scores.get("Overall duplicity of the dataset", "N/A")
+
+    # Outliers
+    out = result.get("outliers", {})
+    out_scores = out.get("Outlier scores", {})
+    overall_outlier = out_scores.get("Overall outlier score", "N/A")
+    feature_outliers = {k: v for k, v in out_scores.items() if k != "Overall outlier score"}
+    if feature_outliers:
+        max_outlier = max(feature_outliers.values())
+        high_outlier = sum(1 for v in feature_outliers.values() if v > 0.05)
+    else:
+        max_outlier = "N/A"
+        high_outlier = 0
+
+    print(f"Data Quality Summary ({n_features} features)")
+    print(f"{'='*45}")
+    print(f"Completeness:  {_fmt(overall_comp)}  (min: {_fmt(min_comp)}, incomplete: {incomplete}/{n_features})")
+    print(f"Duplicity:     {_fmt(dup_ratio)}")
+    print(f"Outliers:      {_fmt(overall_outlier)}  (max: {_fmt(max_outlier)}, >5%: {high_outlier}/{n_features})")
+
+
+def _fmt(v) -> str:
+    if isinstance(v, float):
+        return f"{v:.4f}"
+    return str(v)
+
+
 def _build_run_kwargs(args: argparse.Namespace) -> dict:
     return {
         "columns": _parse_list(args.columns),
@@ -84,6 +129,7 @@ def main() -> None:
     dq_parser.add_argument("file_path")
     dq_parser.add_argument("--file-type", dest="file_type", default=None)
     dq_parser.add_argument("-v", "--verbose", action="store_true", help="Show progress output")
+    dq_parser.add_argument("--detail", action="store_true", help="Output full per-feature JSON instead of summary")
 
     args = parser.parse_args()
 
@@ -119,7 +165,10 @@ def main() -> None:
                 verbose=args.verbose,
                 strip_visualizations=True,
             )
-            _dump_result(result)
+            if args.detail:
+                _dump_result(result)
+            else:
+                _summarize_data_quality(result)
             return
     except Exception as exc:
         sys.stderr.write(f"Error: {exc}\n")
