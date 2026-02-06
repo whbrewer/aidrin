@@ -64,6 +64,46 @@ def _fmt(v) -> str:
     return str(v)
 
 
+def _summarize_metric(metric_name: str, result: dict) -> None:
+    """Print a compact summary for a single metric result."""
+    if metric_name == "completeness":
+        overall = result.get("Overall Completeness", "N/A")
+        scores = result.get("Completeness scores", {})
+        n = len(scores)
+        if scores:
+            vals = list(scores.values())
+            incomplete = sum(1 for v in vals if v < 1.0)
+            print(f"Completeness ({n} features): {_fmt(overall)}  (min: {_fmt(min(vals))}, incomplete: {incomplete}/{n})")
+        else:
+            print(f"Completeness: {_fmt(overall)}")
+    elif metric_name == "duplicity":
+        dup_scores = result.get("Duplicity scores", {})
+        ratio = dup_scores.get("Overall duplicity of the dataset", "N/A")
+        print(f"Duplicity: {_fmt(ratio)}")
+    elif metric_name == "outliers":
+        scores = result.get("Outlier scores", {})
+        overall = scores.get("Overall outlier score", "N/A")
+        feature_scores = {k: v for k, v in scores.items() if k != "Overall outlier score"}
+        n = len(feature_scores)
+        if feature_scores:
+            mx = max(feature_scores.values())
+            high = sum(1 for v in feature_scores.values() if v > 0.05)
+            print(f"Outliers ({n} features): {_fmt(overall)}  (max: {_fmt(mx)}, >5%: {high}/{n})")
+        else:
+            print(f"Outliers: {_fmt(overall)}")
+    else:
+        # Generic: print top-level keys with scalar values, count dict/list values
+        for k, v in result.items():
+            if "visualization" in k.lower():
+                continue
+            if isinstance(v, dict):
+                print(f"{k}: ({len(v)} entries)")
+            elif isinstance(v, list):
+                print(f"{k}: [{len(v)} items]")
+            else:
+                print(f"{k}: {_fmt(v)}")
+
+
 def _build_run_kwargs(args: argparse.Namespace) -> dict:
     return {
         "columns": _parse_list(args.columns),
@@ -105,6 +145,7 @@ def _configure_common_run_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--image-dir", default=None)
     parser.add_argument("-v", "--verbose", action="store_true", help="Show progress output")
     parser.add_argument("--no-viz", action="store_true", help="Strip visualization data from output")
+    parser.add_argument("--detail", action="store_true", help="Output full per-feature JSON instead of summary")
 
 
 def main() -> None:
@@ -145,7 +186,10 @@ def main() -> None:
                 file_type=args.file_type,
                 **_build_run_kwargs(args),
             )
-            _dump_result(result)
+            if args.detail:
+                _dump_result(result)
+            else:
+                _summarize_metric(args.metric.strip().lower(), result)
             return
 
         if args.command == "batch":
