@@ -169,7 +169,7 @@ def _strip_visualizations(result: Any) -> Any:
         return {
             k: _strip_visualizations(v)
             for k, v in result.items()
-            if "visualization" not in k.lower()
+            if not isinstance(k, str) or "visualization" not in k.lower()
         }
     return result
 
@@ -196,7 +196,8 @@ def _maybe_save_images(
     updated: Dict[str, Any] = {}
     for key, value in result.items():
         if (
-            isinstance(value, str)
+            isinstance(key, str)
+            and isinstance(value, str)
             and "visualization" in key.lower()
             and value.strip()
         ):

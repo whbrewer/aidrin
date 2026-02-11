@@ -1,4 +1,5 @@
 import json
+import os
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional
 
@@ -54,6 +55,17 @@ class HeadlessConfig:
         with open(path, "r", encoding="utf-8") as handle:
             payload = json.load(handle)
         return cls.from_dict(payload)
+
+    @classmethod
+    def from_file(cls, path: str) -> "HeadlessConfig":
+        ext = os.path.splitext(path)[1].lower()
+        if ext in (".yaml", ".yml"):
+            import yaml
+
+            with open(path, "r", encoding="utf-8") as handle:
+                payload = yaml.safe_load(handle)
+            return cls.from_dict(payload or {})
+        return cls.from_json_file(path)
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)

@@ -160,7 +160,7 @@ def main() -> None:
     run_parser.add_argument("file_path")
     _configure_common_run_args(run_parser)
 
-    batch_parser = subparsers.add_parser("batch", help="Run metrics from config JSON")
+    batch_parser = subparsers.add_parser("batch", help="Run metrics from config file (JSON or YAML)")
     batch_parser.add_argument("config_path")
     batch_parser.add_argument("-v", "--verbose", action="store_true", help="Show progress output")
     batch_parser.add_argument("--no-viz", action="store_true", help="Strip visualization data from output")
@@ -193,7 +193,7 @@ def main() -> None:
             return
 
         if args.command == "batch":
-            config = HeadlessConfig.from_json_file(args.config_path)
+            config = HeadlessConfig.from_file(args.config_path)
             result = run_batch_metrics(
                 config,
                 verbose=args.verbose,
