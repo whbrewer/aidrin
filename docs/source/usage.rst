@@ -100,7 +100,7 @@ Calculates correlations between specified columns (numerical or categorical). Yo
    from aidrin import calculate_correlations
    result = calculate_correlations(columns=['age', 'education.num'], file_info=file_info)
 
-**Returns**: A dictionary with numerical correlation scores (using Pearson’s coefficient) and categorical correlation analysis using Theil's U statistic. It will also return a visualization (heatmap) of the correlations.
+**Returns**: A dictionary with numerical correlation scores (using Pearson’s coefficient) and categorical correlation analysis using Theil’s U statistic. It will also return a visualization (heatmap) of the correlations.
 
 calculate_class_distribution
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
