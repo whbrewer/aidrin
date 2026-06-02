@@ -30,6 +30,7 @@ dependencies = [
     "h5py>=3.14.0",
     "openpyxl>=3.1.5",
     "pgeocode>=0.5.0",
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]
@@ -47,6 +48,19 @@ telemetry = [
 ]
 llm = [
     "openai>=1.0",
+]
+agentic = [
+    "openai>=1.6.0",
+    "langchain>=0.3.0",
+    "langchain-openai>=0.3.0",
+    "langchain-community>=0.3.0",
+    "langchain-text-splitters>=0.3.0",
+    "faiss-cpu>=1.7.0",
+    "numpy>=1.26.4",
+    "pandas>=2.0.0",
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0.0",
+    "pymupdf>=1.24.0",
 ]
 dev = [
     "pytest>=7.0",
@@ -73,8 +87,14 @@ docs = [
 # Start Celery beat (scheduled tasks):
 #   uv run celery -A worker.make_celery beat --loglevel=info
 
+[project.scripts]
+aidrin = "aidrin.headless.cli:main"
+
 [tool.setuptools.packages.find]
 include = ["aidrin*", "web*", "worker*"]
+
+[tool.setuptools.package-data]
+"aidrin.agentic" = []
 
 [tool.setuptools.dynamic]
 version = {attr = "aidrin._version.__version__"}
@@ -96,6 +116,19 @@ docs = [
     "sphinx-rtd-theme==1.2.2",
     "sphinxemoji",
     "breathe",
+]
+agentic = [
+    "openai>=1.6.0",
+    "langchain>=0.3.0",
+    "langchain-openai>=0.3.0",
+    "langchain-community>=0.3.0",
+    "langchain-text-splitters>=0.3.0",
+    "faiss-cpu>=1.7.0",
+    "numpy>=1.26.4",
+    "pandas>=2.0.0",
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0.0",
+    "pymupdf>=1.24.0",
 ]
 
 

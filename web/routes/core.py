@@ -11,9 +11,11 @@ from flask import (
     render_template,
     request,
     send_file,
+    send_from_directory,
     session,
     url_for,
 )
+from werkzeug.utils import secure_filename
 from aidrin.file_handling.file_parser import SUPPORTED_FILE_TYPES, READER_MAP, read_file
 from web.routes.utils import (
     clear_all_user_cache,
@@ -46,7 +48,7 @@ def inspector():
             )
 
             display_name = file.filename
-            filename = f"{uuid.uuid4().hex}_{file.filename}"
+            filename = f"{uuid.uuid4().hex}_{secure_filename(file.filename)}"
             file_path = os.path.join(current_app.config["UPLOAD_FOLDER"], filename)
             file.save(file_path)
 
@@ -145,7 +147,13 @@ def inspector():
         )
     except Exception as e:
         file_upload_time_log.error("Error rendering workspace: %s", e, exc_info=True)
-        return f"<h1>Workspace render error</h1><pre>{e}</pre>", 500
+        return "<h1>Workspace render error</h1>", 500
+
+
+@core_bp.route("/sample-data/<file_type>/<path:filename>")
+def sample_data(file_type, filename):
+    base = current_app.config["SAMPLE_DATA_FOLDER"]
+    return send_from_directory(os.path.join(base, file_type), filename, as_attachment=True)
 
 
 @core_bp.route("/upload-file", methods=["GET", "POST"])
@@ -199,9 +207,9 @@ def clear_file():
             file_path = os.path.join(upload_folder, filename)
             if os.path.isfile(file_path):
                 os.remove(file_path)
-    except Exception as e:
-        file_upload_time_log.info("File Clear Failure: Unable to clear folder")
-        return jsonify({"success": False, "error": str(e)}), 500
+    except Exception:
+        file_upload_time_log.error("File Clear Failure: Unable to clear folder", exc_info=True)
+        return jsonify({"success": False, "error": "An internal error occurred"}), 500
 
     return redirect(url_for("core.inspector"))
 
@@ -227,8 +235,8 @@ def filter_file():
 
         return jsonify({"success": True, "message": "File filtered successfully"})
     except Exception as e:
-        file_upload_time_log.error("Error in filter_file: %s", e)
-        return jsonify({"success": False, "error": str(e)}), 500
+        file_upload_time_log.error("Error in filter_file: %s", e, exc_info=True)
+        return jsonify({"success": False, "error": "An internal error occurred"}), 500
 
 
 @core_bp.route("/my-cache", methods=["GET"])
@@ -274,7 +282,8 @@ def clear_cache():
             }
         )
     except Exception as e:
-        return jsonify({"success": False, "message": f"Error clearing cache: {str(e)}"}), 500
+        file_upload_time_log.error("Error clearing cache: %s", e, exc_info=True)
+        return jsonify({"success": False, "message": "An internal error occurred"}), 500
 
 
 @core_bp.route("/cached-result/<metric_name>")
@@ -308,7 +317,8 @@ def summary_statistics():
                 return redirect(url_for("core.summary_statistics"))
             return redirect(url_for("core.inspector"))
         except Exception as e:
-            return jsonify({"success": False, "message": str(e)})
+            file_upload_time_log.error("Error in summary_statistics POST: %s", e, exc_info=True)
+            return jsonify({"success": False, "message": "An internal error occurred"})
 
     try:
         file_path = session.get("uploaded_file_path")
@@ -356,7 +366,8 @@ def summary_statistics():
         })
         return jsonify(response_data)
     except Exception as e:
-        return jsonify({"success": False, "message": str(e)})
+        file_upload_time_log.error("Error computing summary statistics: %s", e, exc_info=True)
+        return jsonify({"success": False, "message": f"{type(e).__name__}: {e}"})
 
 
 @core_bp.route("/feature-set", methods=["POST"])
@@ -398,4 +409,5 @@ def extract_features():
         }
         return jsonify(response_data)
     except Exception as e:
-        return jsonify({"success": False, "message": str(e)})
+        file_upload_time_log.error("Error extracting features: %s", e, exc_info=True)
+        return jsonify({"success": False, "message": f"{type(e).__name__}: {e}"})

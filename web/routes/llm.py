@@ -45,7 +45,7 @@ def configure():
         "model": "gpt-4o-mini"
     }
     """
-    data = request.get_json()
+    data = request.get_json(silent=True)
     if not data:
         return jsonify({"error": "No JSON body provided"}), 400
 
@@ -58,16 +58,17 @@ def configure():
     except (TypeError, ValueError):
         temperature = 0.5
 
+    api_base = (data.get("api_base") or "https://api.openai.com/v1").strip()
+    model = (data.get("model") or "gpt-4o-mini").strip()
+
     session["llm_config"] = {
-        "api_base": (data.get("api_base") or "https://api.openai.com/v1").strip(),
+        "api_base": api_base,
         "api_key": api_key,
-        "model": (data.get("model") or "gpt-4o-mini").strip(),
+        "model": model,
         "temperature": max(0.0, min(2.0, temperature)),
     }
 
-    logger.info("LLM configured: model=%s, base=%s",
-                session["llm_config"]["model"],
-                session["llm_config"]["api_base"])
+    logger.info("LLM configured: model=%s, base=%s", model, api_base)
     return jsonify({"success": True})
 
 
@@ -93,7 +94,7 @@ def test_connection():
     if not is_llm_available():
         return jsonify({"error": "openai package not installed"}), 400
 
-    data = request.get_json()
+    data = request.get_json(silent=True)
     if not data or not data.get("api_key"):
         return jsonify({"error": "API key is required"}), 400
 
@@ -118,7 +119,7 @@ def test_connection():
         return jsonify({"success": True, "reply": reply})
     except Exception as e:
         logger.warning("LLM test connection failed: %s", e)
-        return jsonify({"error": str(e)}), 400
+        return jsonify({"error": f"{type(e).__name__}: {e}"}), 400
 
 
 # ---------------------------------------------------------------------------
@@ -141,7 +142,7 @@ def explain():
     if not config or not config.get("api_key"):
         return jsonify({"error": "LLM not configured"}), 400
 
-    data = request.get_json()
+    data = request.get_json(silent=True)
     if not data:
         return jsonify({"error": "No JSON body provided"}), 400
 
@@ -171,8 +172,8 @@ def explain():
     try:
         explanation = explain_metric(full_description, visualization, config)
     except Exception as e:
-        logger.error("LLM explain error: %s", e)
-        return jsonify({"error": str(e)}), 500
+        logger.error("LLM explain error: %s", e, exc_info=True)
+        return jsonify({"error": "An internal error occurred"}), 500
 
     if not explanation:
         return jsonify({"error": "LLM returned an empty response"}), 500
@@ -200,7 +201,7 @@ def cache_explanation():
     from web.routes.utils import get_current_user_id
     from flask import current_app
 
-    data = request.get_json()
+    data = request.get_json(silent=True)
     if not data:
         return jsonify({"error": "No JSON body provided"}), 400
 
