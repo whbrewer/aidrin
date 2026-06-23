@@ -1,6 +1,6 @@
 """Tests for the public API exposed via ``aidrin.__init__``.
 
-These verify that every function documented in ``usage.rst`` is importable
+These verify that every function documented in ``web_usage.rst`` is importable
 directly from ``aidrin`` and returns the expected dict structure on a small
 synthetic dataset — no Flask, Celery broker, or Redis required.
 """

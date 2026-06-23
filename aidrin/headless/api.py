@@ -13,6 +13,7 @@ from .runners import (
     run_class_imbalance,
     run_completeness,
     run_correlations,
+    run_differential_privacy,
     run_duplicity,
     run_entropy_risk,
     run_feature_relevance,
@@ -111,7 +112,13 @@ METRIC_REGISTRY: Dict[str, Dict[str, Any]] = {
         "description": "Multiple attribute Markov-model risk scores.",
         "runner": run_multiple_attribute_risk,
         "required_args": ["id-column", "eval-columns"],
-    }
+    },
+    "differential_privacy": {
+        "category": "data-governance",
+        "description": "Differentially private noise statistics for selected columns.",
+        "runner": run_differential_privacy,
+        "required_args": ["columns", "epsilon"],
+    },
 }
 
 

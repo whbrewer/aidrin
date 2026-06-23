@@ -151,8 +151,12 @@ def inspector():
         return "<h1>Workspace render error</h1>", 500
 
 
+_SAMPLE_DATA_TYPES = {"csv", "json", "h5", "parquet", "xlsx"}
+
 @core_bp.route("/sample-data/<file_type>/<path:filename>")
 def sample_data(file_type, filename):
+    if file_type not in _SAMPLE_DATA_TYPES:
+        return jsonify({"error": "Invalid file type"}), 400
     base = current_app.config["SAMPLE_DATA_FOLDER"]
     return send_from_directory(os.path.join(base, file_type), filename, as_attachment=True)
 
