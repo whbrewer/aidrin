@@ -153,6 +153,7 @@ def inspector():
 
 _SAMPLE_DATA_TYPES = {"csv", "json", "h5", "parquet", "xlsx"}
 
+
 @core_bp.route("/sample-data/<file_type>/<path:filename>")
 def sample_data(file_type, filename):
     if file_type not in _SAMPLE_DATA_TYPES:
