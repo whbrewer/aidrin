@@ -325,7 +325,7 @@ at that time.
 column keys is applied to every metric listed in `metrics`. Use batch only for
 metrics that share identical args (e.g. the zero-arg quality baseline).
 
-Config keys use dash names (not underscores):
+Config keys use dash names (underscore forms are also accepted in batch config). Set `"save-images": false` to suppress the PNG writes that `aidrin run` produces by default:
 
 | Key                          | Used by metric(s)                              |
 |------------------------------|------------------------------------------------|

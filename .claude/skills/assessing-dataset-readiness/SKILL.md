@@ -119,6 +119,7 @@ commands run.
   `--detail` is passed to it.
 - `statistical_rates` is label-distribution, not model-output fairness.
 - Run produces no ready/not-ready verdict — that is the user's call.
+- `aidrin run` writes visualization PNGs to `/tmp/aidrin_images` by default and has no flag to disable it (the `run` parser only accepts `-v` and positional args). This is a harmless side effect of assessment. If you need to avoid the temp-file writes, run those metrics via `aidrin batch` with `"save-images": false` in the config.
 
 ## Scope
 This skill covers metric assessment only. Out of scope: the `aidrin agentic`
