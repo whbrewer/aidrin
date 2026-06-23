@@ -42,7 +42,7 @@ non-CSV files (AIDRIN's JSON/NPZ/H5 readers reshape data differently). Use:
 
 ```python
 from aidrin.file_handling.file_parser import read_file
-df = read_file((path, name, ext))   # ext like ".csv"; name is the filename
+df = read_file((path, name, ext))   # path = full file path, name = filename, ext = e.g. ".csv"
 print(df.columns.tolist()); print(df.dtypes); print(df.head())
 ```
 
@@ -65,6 +65,8 @@ rationale per metric. Always include the zero-arg quality baseline.
 | Contains PII / sensitive data | governance + privacy set above | quasi-identifiers, sensitive column |
 
 Always-run baseline (zero-arg): completeness, duplicity, outliers.
+
+_Names above are readable labels. Under `aidrin run` use dash form (e.g. `class-imbalance`); see [reference/metrics.md](reference/metrics.md) for exact CLI names and arg order._
 
 ### 5. Confirm the plan (HARD gate)
 Present the plan AND explicitly list every inferred column role — target /
@@ -93,8 +95,14 @@ let the user decide. Save each metric's raw JSON next to the report and list the
 commands run.
 
 ## Gotchas
-- `aidrin run` args are POSITIONAL in `required_args` order, not `--flags`. Quote
-  comma-separated column lists: `"zip,age"`. Dash-named keys are batch-config only.
+- If `aidrin` is not on your PATH, see [reference/installation.md](reference/installation.md) for the invocation form (e.g. `python -m aidrin.headless.cli` or, in a uv setup, `uv run aidrin`).
+- Under `aidrin run`, the **metric name must be dash form** (`class-imbalance`, not
+  `class_imbalance`) — underscore forms are rejected by `aidrin run`. Per-metric args
+  are **positional**, in the order shown by `aidrin run <metric> -h` (see
+  [reference/metrics.md](reference/metrics.md)), not `--flags`. Quote comma-separated
+  column lists: `"zip,age"`. (Batch config *parameter keys* like `target-column`/
+  `quasi-identifiers` are also dash form, but those live in the config file, not in a
+  `run` command.)
 - Confirm exact per-metric arg order with `aidrin run <metric> -h` or
   reference/metrics.md. `feature_relevance` needs at least one of
   categorical/numerical columns plus the target, or it exits 2.
@@ -103,7 +111,8 @@ commands run.
 - For non-CSV (JSON/NPZ/H5), derive the schema via `read_file`, not a plain pandas
   read — column sets differ.
 - `--detail` is already the default for `run`/`batch` (full JSON, viz stripped);
-  no need to add it. `data-quality` summarizes unless `--detail`.
+  no need to add it. The separate `aidrin data-quality` command summarizes unless
+  `--detail` is passed to it.
 - `statistical_rates` is label-distribution, not model-output fairness.
 - Run produces no ready/not-ready verdict — that is the user's call.
 

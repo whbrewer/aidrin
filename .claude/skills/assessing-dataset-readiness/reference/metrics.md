@@ -22,8 +22,8 @@
 - Column lists are comma-separated strings; quote them: `"col_a,col_b"`.
 - `--detail` defaults on for `run`/`batch` (full JSON). Visualizations are
   stripped by default.
-- The working invocation on this repo is `uv run aidrin <args>` (a uv venv
-  with Python 3.13 is used; bare `aidrin` may not resolve).
+- Examples use bare `aidrin`. If `aidrin` is not on PATH, see
+  reference/installation.md for the invocation form (e.g. `uv run aidrin`).
 - Per metric below: **Syntax**, **Args (in order)**, **Output keys**,
   **Direction** (what higher/lower means; no fixed pass/fail threshold).
 
@@ -43,7 +43,7 @@
 **Example:**
 
 ```bash
-uv run aidrin run completeness examples/sample_data/csv/adult.csv
+aidrin run completeness examples/sample_data/csv/adult.csv
 ```
 
 ---
@@ -59,7 +59,7 @@ uv run aidrin run completeness examples/sample_data/csv/adult.csv
 **Example:**
 
 ```bash
-uv run aidrin run duplicity examples/sample_data/csv/adult.csv
+aidrin run duplicity examples/sample_data/csv/adult.csv
 ```
 
 ---
@@ -75,7 +75,7 @@ uv run aidrin run duplicity examples/sample_data/csv/adult.csv
 **Example:**
 
 ```bash
-uv run aidrin run outliers examples/sample_data/csv/adult.csv
+aidrin run outliers examples/sample_data/csv/adult.csv
 ```
 
 ---
@@ -96,7 +96,7 @@ uv run aidrin run outliers examples/sample_data/csv/adult.csv
 **Example:**
 
 ```bash
-uv run aidrin run correlations examples/sample_data/csv/adult.csv "age,education.num"
+aidrin run correlations examples/sample_data/csv/adult.csv "age,education.num"
 ```
 
 ---
@@ -117,7 +117,7 @@ uv run aidrin run correlations examples/sample_data/csv/adult.csv "age,education
 **Example (both categorical and numerical columns provided):**
 
 ```bash
-uv run aidrin run feature-relevance examples/sample_data/csv/adult.csv \
+aidrin run feature-relevance examples/sample_data/csv/adult.csv \
   "workclass,education,occupation" "age,education.num" income
 ```
 
@@ -139,7 +139,7 @@ uv run aidrin run feature-relevance examples/sample_data/csv/adult.csv \
 **Example:**
 
 ```bash
-uv run aidrin run class-imbalance examples/sample_data/csv/adult.csv income
+aidrin run class-imbalance examples/sample_data/csv/adult.csv income
 ```
 
 ---
@@ -159,7 +159,7 @@ uv run aidrin run class-imbalance examples/sample_data/csv/adult.csv income
 **Example:**
 
 ```bash
-uv run aidrin run statistical-rates examples/sample_data/csv/adult.csv income sex
+aidrin run statistical-rates examples/sample_data/csv/adult.csv income sex
 ```
 
 ---
@@ -177,7 +177,7 @@ uv run aidrin run statistical-rates examples/sample_data/csv/adult.csv income se
 **Example:**
 
 ```bash
-uv run aidrin run representation-rate examples/sample_data/csv/adult.csv "sex,race"
+aidrin run representation-rate examples/sample_data/csv/adult.csv "sex,race"
 ```
 
 ---
@@ -197,7 +197,7 @@ uv run aidrin run representation-rate examples/sample_data/csv/adult.csv "sex,ra
 **Example:**
 
 ```bash
-uv run aidrin run k-anonymity examples/sample_data/csv/adult.csv "age,sex,race"
+aidrin run k-anonymity examples/sample_data/csv/adult.csv "age,sex,race"
 ```
 
 ---
@@ -216,7 +216,7 @@ uv run aidrin run k-anonymity examples/sample_data/csv/adult.csv "age,sex,race"
 **Example:**
 
 ```bash
-uv run aidrin run l-diversity examples/sample_data/csv/adult.csv "age,sex,race" income
+aidrin run l-diversity examples/sample_data/csv/adult.csv "age,sex,race" income
 ```
 
 ---
@@ -235,7 +235,7 @@ uv run aidrin run l-diversity examples/sample_data/csv/adult.csv "age,sex,race" 
 **Example:**
 
 ```bash
-uv run aidrin run t-closeness examples/sample_data/csv/adult.csv "age,sex,race" income
+aidrin run t-closeness examples/sample_data/csv/adult.csv "age,sex,race" income
 ```
 
 ---
@@ -253,7 +253,7 @@ uv run aidrin run t-closeness examples/sample_data/csv/adult.csv "age,sex,race" 
 **Example:**
 
 ```bash
-uv run aidrin run entropy-risk examples/sample_data/csv/adult.csv "age,sex,race"
+aidrin run entropy-risk examples/sample_data/csv/adult.csv "age,sex,race"
 ```
 
 ---
@@ -272,7 +272,7 @@ uv run aidrin run entropy-risk examples/sample_data/csv/adult.csv "age,sex,race"
 **Example:**
 
 ```bash
-uv run aidrin run single-attribute-risk examples/sample_data/csv/adult.csv ID "age,occupation"
+aidrin run single-attribute-risk examples/sample_data/csv/adult.csv ID "age,occupation"
 ```
 
 (Replace `ID` with your dataset's row-identifier column.)
@@ -294,7 +294,7 @@ uv run aidrin run single-attribute-risk examples/sample_data/csv/adult.csv ID "a
 **Example:**
 
 ```bash
-uv run aidrin run multiple-attribute-risk examples/sample_data/csv/adult.csv ID "age,occupation"
+aidrin run multiple-attribute-risk examples/sample_data/csv/adult.csv ID "age,occupation"
 ```
 
 (Replace `ID` with your dataset's row-identifier column.)
