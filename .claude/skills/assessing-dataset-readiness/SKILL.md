@@ -84,7 +84,10 @@ casing / non-existent columns before running.
   errors and lets each metric use its own columns.
 - Batch only an arg-identical group. The zero-arg baseline is the natural batch:
   `aidrin batch <config>` with `{"file_path": "...", "metrics": ["completeness","duplicity","outliers"]}`.
-- If a metric errors, record it as "Not run: <reason>" and continue with the rest.
+- If a metric fails, record it as "Not run: <reason>" and continue with the rest.
+  NOTE: `aidrin run` exits 0 even on failure — detect a failed metric by checking
+  its JSON output for an `Error` / `ErrorType` key (e.g. `"ErrorType": "Validation Error"`),
+  not the exit code.
 
 ### 8. Write the report
 Fill in [assets/report-template.md](assets/report-template.md). Report each
@@ -95,6 +98,7 @@ let the user decide. Save each metric's raw JSON next to the report and list the
 commands run.
 
 ## Gotchas
+- `aidrin run` returns exit 0 even when a metric fails; failures appear as an `Error`/`ErrorType` key in the JSON output. Detect failures by inspecting the JSON, not the exit code.
 - If `aidrin` is not on your PATH, see [reference/installation.md](reference/installation.md) for the invocation form (e.g. `python -m aidrin.headless.cli` or, in a uv setup, `uv run aidrin`).
 - Under `aidrin run`, the **metric name must be dash form** (`class-imbalance`, not
   `class_imbalance`) — underscore forms are rejected by `aidrin run`. Per-metric args
