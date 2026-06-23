@@ -16,8 +16,9 @@
 
 - `aidrin run <metric> <file> <args...>` — args are POSITIONAL, in the order
   shown by `aidrin run <metric> -h`. NOT `--flags`.
-- Metric names accept either dashes or underscores: `class-imbalance` and
-  `class_imbalance` both resolve.
+- Metric names use **dash form** under `aidrin run` (`class-imbalance`,
+  `feature-relevance`, `k-anonymity`, etc.). Underscore forms are NOT accepted by
+  `aidrin run`.
 - Column lists are comma-separated strings; quote them: `"col_a,col_b"`.
 - `--detail` defaults on for `run`/`batch` (full JSON). Visualizations are
   stripped by default.
@@ -274,6 +275,8 @@ uv run aidrin run entropy-risk examples/sample_data/csv/adult.csv "age,sex,race"
 uv run aidrin run single-attribute-risk examples/sample_data/csv/adult.csv ID "age,occupation"
 ```
 
+(Replace `ID` with your dataset's row-identifier column.)
+
 ---
 
 ### multiple_attribute_risk
@@ -293,6 +296,8 @@ uv run aidrin run single-attribute-risk examples/sample_data/csv/adult.csv ID "a
 ```bash
 uv run aidrin run multiple-attribute-risk examples/sample_data/csv/adult.csv ID "age,occupation"
 ```
+
+(Replace `ID` with your dataset's row-identifier column.)
 
 ---
 
