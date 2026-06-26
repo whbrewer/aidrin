@@ -17,6 +17,7 @@ from aidrin.headless.api import (
     run_custom_metric_remedy,
     run_data_quality,
     run_metric,
+    summarize_dataset as _summarize_dataset,
 )
 from aidrin.headless.config import HeadlessConfig
 
@@ -25,6 +26,34 @@ mcp_server = FastMCP("aidrin")
 
 def _dumps(obj: Any) -> str:
     return json.dumps(obj, indent=2, default=str)
+
+
+# ---------------------------------------------------------------------------
+# Dataset summary
+# ---------------------------------------------------------------------------
+
+
+@mcp_server.tool()
+def summarize_dataset(
+    file_path: str,
+    file_type: str | None = None,
+    max_features: int | None = None,
+) -> str:
+    """
+    Summarize a dataset's numerical and categorical features.
+    Returns shape, column names, descriptive stats (mean/std/min/max/quartiles),
+    and missing counts. Use as the first step when assessing a dataset to identify
+    column roles (target, sensitive attributes, quasi-identifiers, id column).
+
+    Args:
+        file_path: Absolute path to the dataset (CSV, Parquet, Excel, HDF5, JSON, NPZ).
+        file_type: Optional file-type override (csv, parquet, xlsx, hdf5, json, npz).
+        max_features: Limit stats to N features total, split evenly between numerical
+                      and categorical. All column names still appear in 'columns'.
+                      If one type has fewer columns than its share, the remainder goes
+                      to the other type.
+    """
+    return _dumps(_summarize_dataset(file_path, file_type=file_type, max_features=max_features))
 
 
 # ---------------------------------------------------------------------------

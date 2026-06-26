@@ -25,8 +25,8 @@ AIDRIN evaluates datasets across six dimensions:
 
 ----
 
-Two Ways to Use AIDRIN
------------------------
+Three Ways to Use AIDRIN
+------------------------
 
 **Web Interface**
    An interactive, browser-based dashboard. Upload a dataset, select dimensions and metrics, and
@@ -40,6 +40,12 @@ Two Ways to Use AIDRIN
    evaluation** component for domain-aware data readiness question answering and remediation
    grounded in scientific literature.
    See :ref:`cli_installation` and :ref:`cli_usage`.
+
+**Claude Code (MCP)**
+   Ask Claude Code to assess your dataset in plain language. AIDRIN ships an MCP server
+   (``aidrin-mcp``) and a Claude Code skill that together let Claude run metrics, interpret
+   results, and write a readiness report — with no commands to remember.
+   See :ref:`aidrin_skill`.
 
 ----
 
@@ -56,6 +62,12 @@ Two Ways to Use AIDRIN
 
    cli_installation
    cli_usage
+
+.. toctree::
+   :maxdepth: 2
+   :caption: AI Assistant Integration
+
+   aidrin_skill
 
 .. toctree::
    :maxdepth: 2

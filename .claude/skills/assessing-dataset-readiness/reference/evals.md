@@ -44,16 +44,23 @@ uv run aidrin run class-imbalance examples/sample_data/json/adult.json income
 
 ---
 
-## Scenario 3: `differential_privacy` is skipped, not crashed
+## Scenario 3: `differential_privacy` is absent — skill offers custom metric scaffold
 
 **Command:**
 ```bash
-uv run aidrin list | grep -i differential_privacy || echo "absent -> skip (correct)"
+uv run aidrin list | grep -i differential_privacy || echo "absent"
 ```
 
-**Outcome:** Printed `absent -> skip (correct)`. `differential_privacy` does not appear in `aidrin list`.
+**Outcome:** `differential_privacy` does not appear in `aidrin list`.
 
-**PASS** — the skill's preflight step correctly identifies and skips this metric.
+**Expected behavior (updated):** When a user requests a metric not in the list,
+the skill should offer to implement it as a custom metric via `create_custom_metric`,
+not silently skip it. The preflight step is correct in detecting absence; the
+response to absence changed from "skip" to "offer to scaffold".
+
+**PASS (detection)** — metric absence is correctly identified at preflight.
+**NOTE:** Eval for the new "offer custom metric" response path is pending — not
+yet covered by an end-to-end scenario.
 
 ---
 

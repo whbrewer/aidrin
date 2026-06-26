@@ -35,4 +35,5 @@ strong group representation skew.]
 
 ## 7. Appendix
 - Raw metric outputs: [paths to saved JSON]
-- Commands executed (the plan): [list]
+- Calls/commands executed (the plan): [list — MCP tool calls or CLI commands]
+- Remedied dataset (if applied): [path to output CSV]
