@@ -21,6 +21,7 @@ only when MCP is absent.
 | Action | MCP tool | CLI equivalent |
 |---|---|---|
 | Preflight | `list_metrics()` | `aidrin list` |
+| Summarize dataset | `summarize_dataset(file_path)` | `aidrin summarize <file>` |
 | Quality baseline | `run_data_quality_check(file_path)` | `aidrin batch` with completeness/duplicity/outliers |
 | Single metric | `run_aidrin_metric(file_path, metric, ...)` | `aidrin run <metric> <file> <args...>` |
 | Batch | `run_batch(config_path)` | `aidrin batch <config>` |
