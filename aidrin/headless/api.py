@@ -14,6 +14,7 @@ from .runners import (
     run_class_imbalance,
     run_completeness,
     run_correlations,
+    run_differential_privacy,
     run_duplicity,
     run_entropy_risk,
     run_feature_relevance,
@@ -112,7 +113,13 @@ METRIC_REGISTRY: Dict[str, Dict[str, Any]] = {
         "description": "Multiple attribute Markov-model risk scores.",
         "runner": run_multiple_attribute_risk,
         "required_args": ["id-column", "eval-columns"],
-    }
+    },
+    "differential_privacy": {
+        "category": "data-governance",
+        "description": "Differentially private noise statistics for selected columns.",
+        "runner": run_differential_privacy,
+        "required_args": ["columns", "epsilon"],
+    },
 }
 
 
@@ -668,12 +675,24 @@ class CustomDR(BaseDRAgent):
     return file_path
 
 
+def _find_script_in_dir(directory: str, stem: str) -> Optional[str]:
+    """Return the path to <stem>.py in directory, case-insensitively."""
+    target = f"{stem}.py".lower()
+    try:
+        for entry in os.listdir(directory):
+            if entry.lower() == target:
+                return os.path.join(directory, entry)
+    except FileNotFoundError:
+        pass
+    return None
+
+
 def _resolve_custom_script(metric_name: str) -> str:
     """Resolve a custom metric name or path to an absolute .py file path.
 
     Resolution order:
     1. If metric_name ends with .py or contains a path separator — treat as a direct path.
-    2. Check the current working directory for <name>.py.
+    2. Check the current working directory for <name>.py (case-insensitive).
     3. Fall back to aidrin/custom_metrics/<name>.py inside the current working directory.
     """
     if metric_name.endswith(".py") or os.sep in metric_name or "/" in metric_name:
@@ -683,14 +702,15 @@ def _resolve_custom_script(metric_name: str) -> str:
         return path
 
     clean_name = _safe_slug(metric_name)
+    cwd = os.getcwd()
 
-    cwd_path = os.path.join(os.getcwd(), f"{clean_name}.py")
-    if os.path.exists(cwd_path):
-        return cwd_path
+    path = _find_script_in_dir(cwd, clean_name)
+    if path:
+        return path
 
-    builtin_path = os.path.join(os.getcwd(), "aidrin", "custom_metrics", f"{clean_name}.py")
-    if os.path.exists(builtin_path):
-        return builtin_path
+    path = _find_script_in_dir(os.path.join(cwd, "aidrin", "custom_metrics"), clean_name)
+    if path:
+        return path
 
     raise FileNotFoundError(
         f"Custom metric '{clean_name}' not found in the current directory or aidrin/custom_metrics/. "

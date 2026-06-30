@@ -7,7 +7,7 @@ Scores three dimensions (each 0.0–1.0, LLM-assigned):
 - ``domain_score``   — how much retrieved domain knowledge contributed
 - ``code_score``     — complexity of the generated code
 
-``overall_score`` is a weighted sum (0.2 × profile + 0.3 × domain + 0.5 × code).
+``overall_score`` is a weighted sum (0.2 × profile + 0.5 × domain + 0.3 × code).
 ``query_class``: ``"easy"`` < 0.35, ``"moderate"`` < 0.65, ``"hard"`` ≥ 0.65.
 
 Optional config section (falls back to retrieval.answer_model if absent):

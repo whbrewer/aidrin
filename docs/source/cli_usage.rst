@@ -378,6 +378,13 @@ directory can live anywhere on disk.
    * - ``-v`` / ``--verbose``
      - Print vector build progress to stderr
 
+.. warning::
+
+   **The embedding model must not change between** ``build-index`` **and** ``run``.
+
+   If a different ``vector_store.embedding_model`` is set in the config when ``run`` is executed,
+   AIDRIN will raise an error immediately. To switch models, re-run ``build-index`` with the new model before calling ``run``.
+
 
 Quickstart: UCI Power Consumption Dataset
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

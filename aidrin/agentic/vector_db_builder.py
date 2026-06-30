@@ -226,8 +226,9 @@ class VectorDBBuilder:
         return vectors, dims
 
     def _save_index(self, embeddings: list[list[float]], dims: int, metadata: list[dict[str, Any]]) -> None:
+        store_doc = {"embedding_model": self.embedding_model_name, "chunks": metadata}
         with self.metadata_path.open("w", encoding="utf-8") as fh:
-            json.dump(metadata, fh, indent=2)
+            json.dump(store_doc, fh, indent=2)
 
         import numpy as np
         emb_array = np.array(embeddings, dtype="float32")

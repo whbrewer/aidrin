@@ -13,7 +13,6 @@ class BaseDRAgent(abc.ABC):
         """Compute and return metric results as a dictionary."""
         pass
 
-    @abc.abstractmethod
-    def remedy(self, **kwargs) -> pd.DataFrame:
+    def remedy(self, **_kwargs) -> pd.DataFrame:
         """Apply remediation to the dataset and return the corrected DataFrame."""
-        pass
+        return self.dataset
