@@ -61,15 +61,15 @@ Three Ways to Use AIDRIN
 
 .. toctree::
    :maxdepth: 2
-   :caption: AI Assistant Integration
+   :caption: Integrations
 
    aidrin_skill
+   appfl_integration
 
 .. toctree::
    :maxdepth: 2
    :caption: More
 
-   appfl_integration
    testing
    contributing
    limitations
