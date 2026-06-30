@@ -391,7 +391,10 @@ def main() -> None:
     summarize_parser = subparsers.add_parser("summarize", help="Describe numerical and categorical features of a dataset")
     summarize_parser.add_argument("file_path", help="Path to the dataset")
     summarize_parser.add_argument("--file-type", dest="file_type", default=None, help="File type override (csv, parquet, xlsx, hdf5, json, npz)")
-    summarize_parser.add_argument("--max-features", dest="max_features", type=int, default=None, help="Limit stats to N features (split evenly between numerical and categorical)")
+    summarize_parser.add_argument(
+        "--max-features", dest="max_features", type=int, default=None,
+        help="Limit stats to N features (split evenly between numerical and categorical)"
+    )
     summarize_parser.add_argument("--summary", dest="human_readable", action="store_true", help="Print human-readable table instead of JSON")
 
     # Agentic evaluation commands
