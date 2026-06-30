@@ -179,7 +179,18 @@ class VectorRetriever:
         if not self.embeddings_path.exists() or not self.metadata_path.exists():
             raise FileNotFoundError(f"Vector store not found under {self.vector_dir}")
         embeddings = np.load(self.embeddings_path)
-        metadata = json.loads(self.metadata_path.read_text(encoding="utf-8"))
+        raw = json.loads(self.metadata_path.read_text(encoding="utf-8"))
+        if isinstance(raw, dict):
+            stored_model = raw.get("embedding_model")
+            if stored_model and stored_model != self.embedding_model:
+                raise ValueError(
+                    f"Embedding model mismatch: the store was built with '{stored_model}' "
+                    f"but the config specifies '{self.embedding_model}'. "
+                    "Delete the store directory and rebuild with the new model."
+                )
+            metadata = raw.get("chunks", [])
+        else:
+            metadata = raw
         return embeddings, metadata
 
     def _embed_query(self, text: str) -> np.ndarray:

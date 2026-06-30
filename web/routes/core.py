@@ -158,7 +158,7 @@ def inspector():
         return "<h1>Workspace render error</h1>", 500
 
 
-_SAMPLE_DATA_TYPES = {"csv", "json", "h5", "parquet", "xlsx"}
+_SAMPLE_DATA_TYPES = {"csv", "json", "h5", "parquet", "xlsx", "npz", "dcat"}
 
 
 @core_bp.route("/sample-data/<file_type>/<path:filename>")
