@@ -65,7 +65,7 @@ AIDRIN ships two things that plug into Claude Code:
 
 - **MCP server** (`aidrin-mcp`) — exposes AIDRIN's metrics as tools that Claude
   can call directly, without you writing any commands.
-- **Skill** (`.claude/skills/assessing-dataset-readiness/`) — tells Claude *how*
+- **Skill** (`.claude/skills/aidrin/`) — tells Claude *how*
   to use those tools: what workflow to follow, which metrics to run for which
   intent, how to interpret results, and how to write the report.
 
@@ -109,7 +109,7 @@ Claude Code automatically starts the `aidrin-mcp` server and makes its tools
 available. No manual configuration needed.
 
 > **Using a different project directory?** Copy `.mcp.json` and the
-> `.claude/skills/assessing-dataset-readiness/` folder into that project's root.
+> `.claude/skills/aidrin/` folder into that project's root.
 > Claude Code will pick both up on next launch.
 
 ### Step 3 — Verify the MCP connection

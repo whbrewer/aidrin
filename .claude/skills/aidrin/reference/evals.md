@@ -1,4 +1,4 @@
-# End-to-end eval results — assessing-dataset-readiness skill
+# End-to-end eval results — aidrin skill
 
 Evaluated against `examples/sample_data/` on 2026-06-23. CLI invocation: `uv run aidrin`.
 

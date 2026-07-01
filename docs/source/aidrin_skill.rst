@@ -21,7 +21,7 @@ Two components plug into Claude Code:
    parameters; the server runs the metric and returns structured JSON. Image side-effects are
    suppressed by default, so only the JSON result comes back.
 
-**Skill** (``.claude/skills/assessing-dataset-readiness/``)
+**Skill** (``.claude/skills/aidrin/``)
    Instructs Claude on the full assessment workflow: which metrics to run for which intent,
    what column roles to confirm before running privacy or fairness metrics, how to interpret
    scores, and how to format the report. The skill is read by Claude Code at session start when
@@ -81,7 +81,7 @@ tools become available to Claude for that session.
 .. note::
 
    **Using a different project directory?** Copy ``.mcp.json`` and the
-   ``.claude/skills/assessing-dataset-readiness/`` folder into your project root. Claude Code
+   ``.claude/skills/aidrin/`` folder into your project root. Claude Code
    will pick both up on next launch.
 
 Step 3 — Verify the connection
