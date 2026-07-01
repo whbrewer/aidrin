@@ -1,6 +1,6 @@
 ---
-name: assessing-dataset-readiness
-description: Assess whether a dataset is AI/ML-ready by running AIDRIN's metrics for data quality, fairness/bias, privacy, and governance, then producing an interpreted readiness report. Supports CSV, Excel (.xls/.xlsb/.xlsx/.xlsm), JSON, NumPy (.npz), HDF5 (.h5), and Parquet files. Use when the user asks "is my data AI ready", "is my dataset ready", "what is the quality of my data", whether data is good enough to train or publish, to check a dataset for bias, fairness, privacy, PII risk, class imbalance, duplicates, outliers, completeness, feature relevance, k-anonymity, or mentions AIDRIN.
+name: aidrin
+description: Use when the user asks "is my data AI ready", "is my dataset ready", "what is the quality of my data", whether data is good enough to train or publish, to check a dataset for bias, fairness, privacy, PII risk, class imbalance, duplicates, outliers, completeness, feature relevance, k-anonymity, or mentions AIDRIN. Supports CSV, Excel (.xls/.xlsb/.xlsx/.xlsm), JSON, NumPy (.npz), HDF5 (.h5), and Parquet files.
 ---
 
 # Assessing dataset AI-readiness with AIDRIN
@@ -22,10 +22,10 @@ only when MCP is absent.
 |---|---|---|
 | Preflight | `list_metrics()` | `aidrin list` |
 | Summarize dataset | `summarize_dataset(file_path)` | `aidrin summarize <file>` |
-| Quality baseline | `run_data_quality_check(file_path)` | `aidrin batch` with completeness/duplicity/outliers |
+| Quality baseline | `run_data_quality_check(file_path)` | `aidrin data-quality <file> [--detail]` |
 | Single metric | `run_aidrin_metric(file_path, metric, ...)` | `aidrin run <metric> <file> <args...>` |
 | Batch | `run_batch(config_path)` | `aidrin batch <config>` |
-| Create custom metric | `create_custom_metric(name, directory)` | — (generates template) |
+| Create custom metric | `create_custom_metric(name, directory)` | `aidrin add-custom-module <name> --dir <dir>` |
 | Run custom metric | `run_custom_metric(metric_name_or_path, file_path)` | `aidrin run custom <path> <file> metric` |
 | Apply custom remedy | `run_custom_remedy(metric_name_or_path, file_path)` | `aidrin run custom <path> <file> remedy` |
 | Build agentic index | `agentic_build_index(config_path)` | `aidrin agentic build-index -c <config>` |
@@ -38,7 +38,7 @@ Copy this checklist and work through it in order:
 ```
 - [ ] 1. Preflight: confirm AIDRIN is available; read which metrics exist
 - [ ] 2. Elicit intent: how will the user use this dataset?
-- [ ] 3. Inspect: read the AIDRIN-parsed schema + a small sample
+- [ ] 3. Inspect: read the AIDRIN-parsed schema + descriptive stats
 - [ ] 4. Plan: map intent + columns → metrics + arguments (with rationale)
 - [ ] 5. Confirm plan with the user (HARD gate on column roles)
 - [ ] 6. Validate planned column names against the schema
@@ -180,12 +180,14 @@ Do not apply any remedy without explicit user confirmation — data changes are 
 When the user wants a non-standard metric or a data-cleaning step:
 
 **MCP:**
-1. `create_custom_metric(name="my_audit", directory="/path/to/dir")` — scaffolds a `.py` file with `metric()` and `remedy()` stubs.
-2. User edits the file: `metric()` returns a dict of scores; `remedy()` returns a cleaned DataFrame.
+1. `create_custom_metric(name="my_audit", directory="/path/to/dir")` — scaffolds a `CustomDR` class template file.
+2. User edits the file: implement `metric(self, **kwargs)` returning a dict; `remedy(self, metric_results)` returning a DataFrame. Access the dataset via `self.dataset`.
 3. `run_custom_metric(metric_name_or_path="/path/to/my_audit.py", file_path="...")` — runs the metric.
 4. `run_custom_remedy(metric_name_or_path="/path/to/my_audit.py", file_path="...", output_dir="...")` — applies the remedy and saves a new CSV.
 
-**CLI:** `aidrin run custom <path> <file> metric` / `aidrin run custom <path> <file> remedy`.
+**CLI:**
+- Scaffold: `aidrin add-custom-module <name> --dir <dir>` — creates the `CustomDR` class template.
+- Run: `aidrin run custom <path> <file> metric` / `aidrin run custom <path> <file> remedy`.
 
 ## Remediation
 
@@ -196,8 +198,7 @@ change — apply it.
 **Workflow:**
 1. Identify the issue from the metric result (e.g. high duplicity, missing values, imbalanced classes).
 2. `create_custom_metric(name="<issue>_remedy", directory="<dataset_dir>")` — scaffold the template.
-3. Implement the `remedy()` method to address the specific issue. The method receives the
-   dataset as a DataFrame and must return a cleaned DataFrame.
+3. Implement the `remedy(self, metric_results)` method to address the specific issue. Access the dataset via `self.dataset` and return a cleaned DataFrame.
 4. `run_custom_remedy(metric_name_or_path="<path>", file_path="<dataset>", output_dir="<dir>")` — apply the fix and save the remedied CSV.
 5. Report: path to the remedied file, what was changed, and any caveats (e.g. rows dropped, values imputed).
 
@@ -249,7 +250,7 @@ vector_store:
 
 retrieval:
   enabled: true                           # false = skip RAG, use LLM knowledge only
-  answer_model: gpt-4o
+  answer_model: gpt-4o                    # any model served at base_url
   top_k: 3
   max_workers: 4                          # questions run in parallel
   question: "Single question as a string"
@@ -261,16 +262,16 @@ retrieval:
 executor:
   enabled: true
   max_attempts: 5                         # self-heal retries
-  model: gpt-4o
+  model: gpt-4o                           # any model served at base_url
   temperature: 0.0
 
 complexity_scorer:
   enabled: true
-  model: gpt-4o
+  model: gpt-4o                           # any model served at base_url
 
 remediation:
   enabled: true
-  model: gpt-4o
+  model: gpt-4o                           # any model served at base_url
 
 output:
   save_log: true
@@ -312,7 +313,7 @@ Returns combined JSON: `profile` + `queries` (one entry per question: retrieval,
 - `--detail` is already the default for `run`/`batch`; no need to add it.
 
 **Both paths:**
-- `list_metrics()` / `aidrin list` is the source of truth for available metrics. If a requested metric is absent (e.g. `differential_privacy`), do not run it — offer to scaffold it as a custom metric instead.
+- `list_metrics()` / `aidrin list` is the source of truth for available metrics. If a requested metric is absent, do not run it — offer to scaffold it as a custom metric instead.
 - For non-CSV (JSON/NPZ/H5), derive the schema via `read_file`, not a plain pandas read — column sets differ.
 - `statistical_rates` is label-distribution, not model-output fairness.
 - `feature_relevance` needs at least one of categorical/numerical columns plus the target, or it exits 2 (CLI) / errors in JSON (MCP).

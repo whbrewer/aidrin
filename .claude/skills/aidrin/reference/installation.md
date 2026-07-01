@@ -17,11 +17,7 @@ If you are using the `uv`-managed environment shipped with this repo (see
 
 From the AIDRIN repository root:
 
-    pip install -e .
-
-This pulls the runtime dependencies the metrics need (pandas, numpy, scipy,
-scikit-learn, matplotlib, seaborn, dython, shap, h5py, openpyxl, pgeocode,
-pyarrow). A partial environment (e.g. missing matplotlib) will fail at import.
+    pip install -e '.[mcp]'
 
 > **Note:** Python 3.9 (macOS system default) is not supported. Use Python
 > 3.10 or later.
@@ -32,12 +28,7 @@ The repo ships a `uv.lock`. If you have [uv](https://github.com/astral-sh/uv)
 installed, you can create a ready-to-use Python 3.13 environment without
 touching your system Python:
 
-    uv sync
-    uv run aidrin list   # quick smoke test
-
-All `aidrin` commands can then be prefixed with `uv run`:
-
-    uv run aidrin run --dataset path/to/data.csv --metric completeness
+    uv sync --group mcp
 
 ## Verify (capability check — also the skill's Step 1 preflight)
 
@@ -49,19 +40,16 @@ Expected: JSON of available metrics grouped by category. This list is the
 source of truth for which metrics exist. If a metric you intend to run is not
 in this output, do not run it — offer to scaffold it as a custom metric instead.
 
-Known gap on the `cli-integration` branch: `differential_privacy` is not
-registered and will NOT appear in `aidrin list`. When the user requests it,
-offer to implement it as a custom metric. When it later appears in `aidrin list`,
-run it natively.
-
 ## Agentic dependencies
 
-The `aidrin agentic` subcommands need extra dependencies and API keys:
+The `agentic_build_index` and `agentic_run` MCP tools need extra dependencies
+and an API key:
 
     pip install 'aidrin[agentic]'
+    export OPENAI_API_KEY="sk-..."
 
-Via MCP: `agentic_build_index` and `agentic_run` tools. Use when the user asks
-for literature-grounded analysis or remediation recommendations.
+Use when the user asks for literature-grounded analysis or remediation
+recommendations.
 
 ---
 
@@ -86,12 +74,18 @@ and picks up the skill automatically when the AIDRIN repo is your working direct
 
 ### Step 1 — Install AIDRIN
 
-Follow the [Install](#install) section above. After `pip install -e .` (or `uv sync`),
-the `aidrin-mcp` console script is available in your environment.
+The `aidrin-mcp` server requires the `[mcp]` extra — a bare `pip install -e .`
+installs the console script but the `mcp` package itself is absent, so
+`aidrin-mcp` will crash with `ModuleNotFoundError` at runtime.
+
+Use one of:
+
+    pip install -e '.[mcp]'     # pip path
+    uv sync --group mcp         # uv path
 
 Verify:
 
-    aidrin-mcp --help
+    which aidrin-mcp   # prints the script path; confirms it is on PATH
 
 ### Step 2 — Open the AIDRIN repo in Claude Code
 
@@ -165,8 +159,9 @@ For literature-grounded evaluation against domain papers and standards:
 
 | Symptom | Fix |
 |---|---|
-| `aidrin-mcp` not found | Run `pip install -e .` from the AIDRIN root, or `uv sync` |
-| Claude uses CLI instead of MCP tools | `.mcp.json` missing or server failed to start — check `aidrin-mcp --help` works |
+| `aidrin-mcp` not found | Run `pip install -e '.[mcp]'` from the AIDRIN root, or `uv sync --group mcp` |
+| `aidrin-mcp` crashes with `ModuleNotFoundError` | The `mcp` package is missing — run `pip install -e '.[mcp]'` or `uv sync --group mcp` |
+| Claude uses CLI instead of MCP tools | `.mcp.json` missing or server failed to start — run `which aidrin-mcp` to confirm the script is on PATH |
 | `aidrin list` fails | See [Install](#install) — likely a missing dependency |
 | Agentic run fails with credential error | Set `OPENAI_API_KEY` env var before launching Claude Code |
 | Agentic run fails with `metadata_csv` error | Your config must include `paths.metadata_csv` pointing to a text description of the dataset |

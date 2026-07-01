@@ -47,11 +47,15 @@ Setup
 Step 1 — Install AIDRIN
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-From the AIDRIN repository root:
+From the AIDRIN repository root. The MCP server requires the ``[mcp]`` extra
+(a bare install puts the script on PATH but ``mcp`` itself is absent, causing
+a ``ModuleNotFoundError`` at runtime):
 
 .. code-block:: bash
 
-   pip install -e .
+   pip install -e '.[mcp]'   # pip path
+   # or, with uv:
+   uv sync --group mcp
 
 Step 2 — Open the AIDRIN directory in Claude Code
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

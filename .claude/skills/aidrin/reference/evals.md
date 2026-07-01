@@ -44,23 +44,32 @@ uv run aidrin run class-imbalance examples/sample_data/json/adult.json income
 
 ---
 
-## Scenario 3: `differential_privacy` is absent — skill offers custom metric scaffold
+## Scenario 3: Absent metric → scaffold custom metric end-to-end
 
-**Command:**
+User requests `data_drift`, which does not exist in the built-in metric catalogue.
+The correct skill behavior: detect absence at preflight, offer to scaffold.
+
+**Commands:**
 ```bash
-uv run aidrin list | grep -i differential_privacy || echo "absent"
+# Step 1 — preflight confirms absence
+aidrin list | grep data_drift || echo "absent"
+# → "absent"
+
+# Step 2 — scaffold (CLI path; MCP uses create_custom_metric)
+aidrin add-custom-module data_drift --dir /path/to/project/
+
+# Step 3 — implement metric() in the generated CustomDR class, then run
+aidrin run custom /path/to/project/data_drift.py examples/sample_data/csv/adult.csv metric
 ```
 
-**Outcome:** `differential_privacy` does not appear in `aidrin list`.
+**Outcome:**
+- `aidrin list | grep data_drift` returned nothing (absence confirmed).
+- `aidrin add-custom-module data_drift --dir <dir>` exited 0, printed the template path and next-step instructions.
+- Unedited scaffold ran immediately and returned `{"message": "Placeholder metric. Implement your logic here."}`, exit 0.
 
-**Expected behavior (updated):** When a user requests a metric not in the list,
-the skill should offer to implement it as a custom metric via `create_custom_metric`,
-not silently skip it. The preflight step is correct in detecting absence; the
-response to absence changed from "skip" to "offer to scaffold".
-
-**PASS (detection)** — metric absence is correctly identified at preflight.
-**NOTE:** Eval for the new "offer custom metric" response path is pending — not
-yet covered by an end-to-end scenario.
+**PASS** — absent-metric detection + scaffold + run path works end-to-end.
+Skill correctly says to offer `create_custom_metric` / `aidrin add-custom-module`
+when `list_metrics()` / `aidrin list` does not contain the requested metric.
 
 ---
 
@@ -89,7 +98,7 @@ exit=0
 |---|---|
 | 1. Training intent (CSV batch + per-metric run) | PASS |
 | 2. Non-CSV schema read + metric run (JSON) | PASS |
-| 3. `differential_privacy` absent from `aidrin list` | PASS |
+| 3. Absent metric (`data_drift`) → scaffold + run end-to-end | PASS |
 | 4. Error isolation — bad column, exit code behavior | PASS (with caveat: always exits 0) |
 
 All core building blocks work. One behavioral note: `aidrin run` always exits 0 regardless of validation errors; errors are indicated only in the JSON body (`"ErrorType": "Validation Error"`). The skill's per-metric isolation pattern handles this correctly in practice, but skill authors should inspect JSON output rather than relying on exit codes.

@@ -303,19 +303,26 @@ aidrin run multiple-attribute-risk examples/sample_data/csv/adult.csv ID "age,oc
 
 ## Privacy
 
-### differential_privacy (currently UNAVAILABLE)
+### differential_privacy
 
-Not registered in the CLI on this branch; absent from `aidrin list`. Do not
-run this metric — `aidrin run differential_privacy` will error.
+- **Syntax:** `aidrin run differential-privacy <file> "<columns>" <epsilon>`
+- **Args (in order):**
+  1. `columns` — comma-separated numerical columns to protect with Laplacian noise
+  2. `epsilon` — privacy budget scalar (smaller = stronger privacy guarantee, more noise; typical range 0.1–10.0)
+- **Output keys:**
+  - `Mean of feature <col>(before noise)` — scalar
+  - `Variance of feature <col>(before noise)` — scalar
+  - `Mean of feature <col>(after noise)` — scalar
+  - `Variance of feature <col>(after noise)` — scalar
+  - `Description` — string explaining the Laplacian noise mechanism
+  - `Noisy file saved` — confirmation string
+- **Direction:** lower epsilon = more privacy (more noise added). Compare before/after variance to quantify the noise impact per column.
 
-When it appears in `aidrin list`, syntax is expected to be:
+**Example:**
 
 ```bash
-aidrin run differential_privacy <file> "<columns>" <epsilon>
+aidrin run differential-privacy examples/sample_data/csv/adult.csv "age,hours.per.week" 1.0
 ```
-
-Confirm the exact positional order via `aidrin run differential_privacy -h`
-at that time.
 
 ---
 
@@ -341,7 +348,7 @@ Config keys use dash names (underscore forms are also accepted in batch config).
 | `id-column`                  | single_attribute_risk, multiple_attribute_risk |
 | `eval-columns`               | single_attribute_risk, multiple_attribute_risk |
 | `columns`                    | correlations, representation_rate              |
-| `epsilon`                    | differential_privacy (unavailable)             |
+| `epsilon`                    | differential_privacy                           |
 | `save-images`                | any metric that produces visualizations        |
 
 **Example — zero-arg quality baseline (all three share no required column args):**
