@@ -1,8 +1,12 @@
 import base64
+import math
 import os
 import re
 import sys
 import time
+import importlib.util
+import numpy as np
+import pandas as pd
 from typing import Any, Dict, List, Optional
 
 from .config import HeadlessConfig
@@ -27,96 +31,111 @@ from .runners import (
 
 METRIC_REGISTRY: Dict[str, Dict[str, Any]] = {
     "completeness": {
-        "category": "data_quality",
+        "category": "data-quality",
         "description": "Column completeness scores and overall completeness.",
         "runner": run_completeness,
         "required_args": [],
     },
     "duplicity": {
-        "category": "data_quality",
-        "description": "Dataset duplicity ratio.",
+        "category": "data-quality",
+        "description": "Dataset duplicates ratio.",
         "runner": run_duplicity,
         "required_args": [],
     },
     "outliers": {
-        "category": "data_quality",
+        "category": "data-quality",
         "description": "Outlier proportions for numerical columns.",
         "runner": run_outliers,
         "required_args": [],
     },
     "correlations": {
-        "category": "correlation",
+        "category": "impact-of-data-on-AI",
         "description": "Categorical and numerical correlation matrices.",
         "runner": run_correlations,
         "required_args": ["columns"],
     },
     "feature_relevance": {
-        "category": "correlation",
-        "description": "Feature relevance to target using Pearson correlation.",
+        "category": "impact-of-data-on-AI",
+        "description": "Feature relevance to target.",
         "runner": run_feature_relevance,
-        "required_args": ["cat_columns", "num_columns", "target_column"],
+        "required_args": ["cat-columns", "num-columns", "target-column"],
     },
     "class_imbalance": {
-        "category": "fairness",
-        "description": "Class imbalance degree and distribution plot.",
+        "category": "fairness-and-bias",
+        "description": "Class imbalance degree.",
         "runner": run_class_imbalance,
-        "required_args": ["target_column"],
+        "required_args": ["target-column"],
     },
     "statistical_rates": {
-        "category": "fairness",
+        "category": "fairness-and-bias",
         "description": "Statistical rates across sensitive groups.",
         "runner": run_statistical_rates,
-        "required_args": ["y_true_column", "sensitive_attribute_column"],
+        "required_args": ["y-true-column", "sensitive-attribute-column"],
     },
     "representation_rate": {
-        "category": "fairness",
+        "category": "fairness-and-bias",
         "description": "Representation rate ratios for categorical values.",
         "runner": run_representation_rate,
         "required_args": ["columns"],
     },
     "k_anonymity": {
-        "category": "privacy",
-        "description": "k-anonymity score and histogram.",
+        "category": "data-governance",
+        "description": "k-anonymity score.",
         "runner": run_k_anonymity,
-        "required_args": ["quasi_identifiers"],
+        "required_args": ["quasi-identifiers"],
     },
     "l_diversity": {
-        "category": "privacy",
-        "description": "l-diversity score and histogram.",
+        "category": "data-governance",
+        "description": "l-diversity score.",
         "runner": run_l_diversity,
-        "required_args": ["quasi_identifiers", "sensitive_column"],
+        "required_args": ["quasi-identifiers", "sensitive-column"],
     },
     "t_closeness": {
-        "category": "privacy",
-        "description": "t-closeness score and histogram.",
+        "category": "data-governance",
+        "description": "t-closeness score.",
         "runner": run_t_closeness,
-        "required_args": ["quasi_identifiers", "sensitive_column"],
+        "required_args": ["quasi-identifiers", "sensitive-column"],
     },
     "entropy_risk": {
-        "category": "privacy",
-        "description": "Entropy risk score and histogram.",
+        "category": "data-governance",
+        "description": "Entropy risk score.",
         "runner": run_entropy_risk,
-        "required_args": ["quasi_identifiers"],
+        "required_args": ["quasi-identifiers"],
     },
     "single_attribute_risk": {
-        "category": "privacy",
+        "category": "data-governance",
         "description": "Single attribute Markov-model risk scores.",
         "runner": run_single_attribute_risk,
-        "required_args": ["id_column", "eval_columns"],
+        "required_args": ["id-column", "eval-columns"],
     },
     "multiple_attribute_risk": {
-        "category": "privacy",
+        "category": "data-governance",
         "description": "Multiple attribute Markov-model risk scores.",
         "runner": run_multiple_attribute_risk,
-        "required_args": ["id_column", "eval_columns"],
+        "required_args": ["id-column", "eval-columns"],
     },
     "differential_privacy": {
-        "category": "privacy",
-        "description": "Differential privacy noise injection statistics.",
+        "category": "data-governance",
+        "description": "Differentially private noise statistics for selected columns.",
         "runner": run_differential_privacy,
         "required_args": ["columns", "epsilon"],
     },
 }
+
+
+def _sanitize(obj: Any) -> Any:
+    """Recursively convert numpy scalars/arrays to native Python types."""
+    if isinstance(obj, dict):
+        return {k: _sanitize(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_sanitize(v) for v in obj]
+    if isinstance(obj, np.integer):
+        return int(obj)
+    if isinstance(obj, np.floating):
+        return float(obj)
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    return obj
 
 
 def _normalize_list(value: Optional[Any]) -> Optional[List[str]]:
@@ -129,19 +148,71 @@ def _normalize_list(value: Optional[Any]) -> Optional[List[str]]:
     return [str(value).strip()]
 
 
-def list_available_metrics(category: Optional[str] = None) -> List[Dict[str, Any]]:
-    results = []
-    for name, meta in METRIC_REGISTRY.items():
-        if category and meta["category"] != category:
+def list_custom_metrics(custom_dir: Optional[str] = None) -> Dict[str, List[Dict[str, Any]]]:
+    """Return metadata for custom modules, split into metrics and remedies."""
+    target_dir = custom_dir or os.path.join(os.getcwd(), "aidrin/custom_metrics")
+    if not os.path.isdir(target_dir):
+        return {"custom_metrics": [], "custom_remedies": []}
+
+    metrics: List[Dict[str, Any]] = []
+    remedies: List[Dict[str, Any]] = []
+    for filename in os.listdir(target_dir):
+        if (
+            not filename.endswith(".py")
+            or filename in {"__init__.py", "base_dr.py"}
+            or filename.startswith("_")
+        ):
             continue
-        results.append(
-            {
-                "name": name,
-                "category": meta["category"],
-                "description": meta["description"],
-                "required_args": list(meta.get("required_args", [])),
-            }
-        )
+        name = filename[:-3]
+        display_name = name.replace("_", "-")
+        metrics.append({
+            "name": display_name,
+            "description": "Custom metric defined in aidrin/custom_metrics. Run with: aidrin run custom <name> <file> metric",
+            "required_args": [],
+        })
+        remedies.append({
+            "name": display_name,
+            "description": "Custom remedy defined in aidrin/custom_metrics. Run with: aidrin run custom <name> <file> remedy",
+            "required_args": [],
+        })
+    return {"custom_metrics": metrics, "custom_remedies": remedies}
+
+
+def list_available_metrics(category: Optional[str] = None) -> List[Dict[str, Any]]:
+    results = {}
+
+    for name, meta in METRIC_REGISTRY.items():
+        metric_category = meta["category"]
+
+        # Filter by category if requested
+        if category and metric_category != category:
+            continue
+
+        # Initialize the category list if it doesn't exist
+        if metric_category not in results:
+            results[metric_category] = []
+
+        arg_map = {
+            "cat-columns": "categorical-columns",
+            "num-columns": "numerical-columns",
+            "y-true-column": "target-column",
+        }
+        raw_args = list(meta.get("required_args", []))
+        display_args = [arg_map.get(arg, arg) for arg in raw_args]
+
+        results[metric_category].append({
+            "name": name.replace("_", "-"),
+            "description": meta["description"],
+            "required_args": display_args
+        })
+
+    # Append custom metrics under their own category unless filtered out
+    custom = list_custom_metrics()
+    if (category is None or category == "custom_metrics") and custom["custom_metrics"]:
+        results["custom_metrics"] = custom["custom_metrics"]
+    if (category is None or category == "custom_remedies") and custom["custom_remedies"]:
+        results["custom_remedies"] = custom["custom_remedies"]
+
     return results
 
 
@@ -157,6 +228,74 @@ def get_metric_info(name: str) -> Dict[str, Any]:
     }
 
 
+def summarize_dataset(
+    file_path: str,
+    file_type: Optional[str] = None,
+    max_features: Optional[int] = None,
+) -> Dict[str, Any]:
+    """Return shape, per-column descriptive stats, and missing counts for a dataset."""
+    from pathlib import Path
+    from aidrin.file_handling.file_parser import read_file
+
+    path = Path(file_path)
+    ext = f".{file_type}" if file_type else path.suffix.lower()
+    df = read_file((file_path, path.name, ext))
+
+    num_cols = df.select_dtypes(include="number").columns.tolist()
+    cat_cols = df.select_dtypes(include="object").columns.tolist()
+    missing = df.isnull().sum()
+
+    if max_features and max_features >= 2:
+        alloc_num = math.ceil(max_features / 2)
+        alloc_cat = math.floor(max_features / 2)
+        if len(num_cols) < alloc_num:
+            alloc_cat = min(len(cat_cols), alloc_cat + alloc_num - len(num_cols))
+        elif len(cat_cols) < alloc_cat:
+            alloc_num = min(len(num_cols), alloc_num + alloc_cat - len(cat_cols))
+        num_display = num_cols[:alloc_num]
+        cat_display = cat_cols[:alloc_cat]
+        truncated = len(num_cols) > alloc_num or len(cat_cols) > alloc_cat
+    else:
+        num_display, cat_display, truncated = num_cols, cat_cols, False
+
+    numerical: Dict[str, Any] = {}
+    if num_display:
+        desc = df[num_display].describe()
+        for col in num_display:
+            numerical[col] = {
+                "count": int(desc.loc["count", col]),
+                "mean": float(desc.loc["mean", col]),
+                "std": float(desc.loc["std", col]),
+                "min": float(desc.loc["min", col]),
+                "25%": float(desc.loc["25%", col]),
+                "50%": float(desc.loc["50%", col]),
+                "75%": float(desc.loc["75%", col]),
+                "max": float(desc.loc["max", col]),
+                "missing": int(missing[col]),
+            }
+
+    categorical: Dict[str, Any] = {}
+    if cat_display:
+        desc = df[cat_display].describe()
+        for col in cat_display:
+            categorical[col] = {
+                "count": int(desc.loc["count", col]),
+                "unique": int(desc.loc["unique", col]),
+                "top": str(desc.loc["top", col]),
+                "freq": int(desc.loc["freq", col]),
+                "missing": int(missing[col]),
+            }
+
+    return {
+        "shape": {"rows": len(df), "columns": len(df.columns)},
+        "columns": df.columns.tolist(),
+        "numerical": numerical,
+        "categorical": categorical,
+        "truncated": truncated,
+        "max_features": max_features,
+    }
+
+
 def _safe_slug(value: str) -> str:
     value = value.strip().lower().replace(" ", "_")
     value = re.sub(r"[^a-z0-9_.-]+", "_", value)
@@ -164,13 +303,27 @@ def _safe_slug(value: str) -> str:
 
 
 def _strip_visualizations(result: Any) -> Any:
-    """Recursively strip visualization data from results."""
+    """Recursively strip visualization (and descriptive-only) data from results."""
+    EXCLUDED_KEYS = {
+        "visualization",
+        "graph interpretation",
+        "plot_data",
+        "histogram_data",
+        "descriptive_statistics",
+        "plot",
+    }
+
     if isinstance(result, dict):
         return {
             k: _strip_visualizations(v)
             for k, v in result.items()
-            if not isinstance(k, str) or "visualization" not in k.lower()
+            if not (isinstance(k, str) and any(key in k.lower() for key in EXCLUDED_KEYS))
         }
+
+    # Handle lists (e.g., if a metric returns a list of dictionaries)
+    if isinstance(result, list):
+        return [_strip_visualizations(item) for item in result]
+
     return result
 
 
@@ -228,7 +381,19 @@ def run_metric(
     metric_key = metric_name.strip().lower()
     metric = METRIC_REGISTRY.get(metric_key)
     if not metric:
-        raise ValueError(f"Unknown metric: {metric_name}")
+        # Try resolving as a custom metric
+        try:
+            _log_progress(f"Running custom metric: {metric_key}...", verbose)
+            start_time = time.time()
+            result = run_custom_metric_logic(metric_key, file_path, **kwargs)
+            result = _maybe_save_images(metric_key, result, save_images, image_dir)
+            if strip_visualizations:
+                result = _strip_visualizations(result)
+            elapsed = time.time() - start_time
+            _log_progress(f"  {metric_key} completed in {elapsed:.2f}s", verbose)
+            return _sanitize(result)
+        except FileNotFoundError:
+            raise ValueError(f"Unknown metric: {metric_name}") from None
 
     _log_progress(f"Running {metric_key}...", verbose)
     start_time = time.time()
@@ -240,16 +405,16 @@ def run_metric(
             result = _strip_visualizations(result)
         elapsed = time.time() - start_time
         _log_progress(f"  {metric_key} completed in {elapsed:.2f}s", verbose)
-        return result
+        return _sanitize(result)
 
     def _finalize(result: Dict[str, Any]) -> Dict[str, Any]:
-        """Apply post-processing: save images and strip visualizations."""
+        """Apply post-processing: save images, strip visualizations, sanitize types."""
         result = _maybe_save_images(metric_key, result, save_images, image_dir)
         if strip_visualizations:
             result = _strip_visualizations(result)
         elapsed = time.time() - start_time
         _log_progress(f"  {metric_key} completed in {elapsed:.2f}s", verbose)
-        return result
+        return _sanitize(result)
 
     if metric_key == "correlations":
         columns = _normalize_list(kwargs.get("columns"))
@@ -446,3 +611,183 @@ def run_privacy_assessment(
         if hasattr(config, key):
             setattr(config, key, value)
     return run_batch_metrics(config)
+
+
+def generate_metric_template(metric_name: str, target_dir: str) -> str:
+    """Creates the directory and the .py file with the CustomDR template."""
+    # 1. Prepare directory
+    if not os.path.exists(target_dir):
+        os.makedirs(target_dir)
+        # Create __init__.py so the folder is a searchable python package
+        with open(os.path.join(target_dir, "__init__.py"), "w") as f:
+            f.write("# Aidrin Custom Metrics Package\n")
+
+    # 2. Sanitize filename (e.g., "My Metric!!" -> "my_metric.py")
+    clean_name = metric_name.strip().lower().replace(" ", "_")
+    clean_name = re.sub(r"[^a-z0-9_]+", "", clean_name)
+    file_path = os.path.join(target_dir, f"{clean_name}.py")
+
+    if os.path.exists(file_path):
+        raise FileExistsError(f"A metric file named '{clean_name}.py' already exists in {target_dir}. Edit that file or choose a different name.")
+
+    # 3. The Class Template
+    content = """from aidrin.custom_metrics.base_dr import BaseDRAgent
+from typing import Any
+from typing import Dict, Union, Any
+import pandas as pd
+
+class CustomDR(BaseDRAgent):
+    def __init__(self, dataset: Any, **kwargs):
+        super().__init__(dataset, **kwargs)
+
+    def metric(self, **kwargs):
+        \"\"\"
+        Implement your custom metric logic here.
+        \"\"\"
+
+        # IMPLEMENT YOUR METRIC LOGIC BELOW
+        # Example: Calculating the total number of missing cells in the entire DataFrame
+
+        # df: pd.DataFrame = self.dataset
+        # return {
+        #     "total_missing_cells": df.isna().sum().to_dict()
+        # }
+
+        return {"message": "Placeholder metric. Implement your logic here."}
+
+    def remedy(self, **kwargs) -> pd.DataFrame:
+        \"\"\"
+        Apply remediation steps to the dataset and return a pandas DataFrame.
+        \"\"\"
+
+        # df: pd.DataFrame = self.dataset.copy()
+        # TODO: implement remediation logic and return the modified DataFrame
+        # Example:
+        # df = df.fillna(0)
+        # return df
+
+        return self.dataset
+    """
+
+    with open(file_path, "w") as f:
+        f.write(content)
+
+    return file_path
+
+
+def _find_script_in_dir(directory: str, stem: str) -> Optional[str]:
+    """Return the path to <stem>.py in directory, case-insensitively."""
+    target = f"{stem}.py".lower()
+    try:
+        for entry in os.listdir(directory):
+            if entry.lower() == target:
+                return os.path.join(directory, entry)
+    except FileNotFoundError:
+        pass
+    return None
+
+
+def _resolve_custom_script(metric_name: str) -> str:
+    """Resolve a custom metric name or path to an absolute .py file path.
+
+    Resolution order:
+    1. If metric_name ends with .py or contains a path separator — treat as a direct path.
+    2. Check the current working directory for <name>.py (case-insensitive).
+    3. Fall back to aidrin/custom_metrics/<name>.py inside the current working directory.
+    """
+    if metric_name.endswith(".py") or os.sep in metric_name or "/" in metric_name:
+        path = os.path.abspath(metric_name)
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"Custom metric file not found: {metric_name}")
+        return path
+
+    clean_name = _safe_slug(metric_name)
+    cwd = os.getcwd()
+
+    path = _find_script_in_dir(cwd, clean_name)
+    if path:
+        return path
+
+    path = _find_script_in_dir(os.path.join(cwd, "aidrin", "custom_metrics"), clean_name)
+    if path:
+        return path
+
+    raise FileNotFoundError(
+        f"Custom metric '{clean_name}' not found in the current directory or aidrin/custom_metrics/. "
+        f"Pass a full path (e.g. aidrin run custom /path/to/{clean_name}.py ...) "
+        f"or run from the directory containing {clean_name}.py."
+    )
+
+
+def run_custom_metric_logic(metric_name: str, file_path: str, **kwargs) -> Dict[str, Any]:
+    """
+    Dynamically loads and executes a CustomDR class from any directory.
+    """
+    script_path = _resolve_custom_script(metric_name)
+    clean_name = os.path.splitext(os.path.basename(script_path))[0]
+
+    if not os.path.exists(script_path):
+        raise FileNotFoundError(f"Custom metric file not found at: {script_path}")
+
+    # 1. Dynamic Import
+    spec = importlib.util.spec_from_file_location(clean_name, script_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    if not hasattr(module, "CustomDR"):
+        raise AttributeError(f"Class 'CustomDR' not found in {script_path}")
+
+    # 2. Load Dataset
+    # You can expand this to support parquet/json as needed
+    _log_progress(f"Loading dataset: {file_path}", kwargs.get("verbose", False))
+    df = pd.read_csv(file_path)
+
+    # 3. Instantiate and Run
+    agent = module.CustomDR(dataset=df, **kwargs)
+
+    _log_progress(f"Executing custom metric: {metric_name}", kwargs.get("verbose", False))
+    results = agent.metric(**kwargs)
+
+    if not isinstance(results, dict):
+        raise TypeError(
+            f"metric() in '{script_path}' must return a dict, got {type(results).__name__}"
+        )
+
+    return results
+
+
+def run_custom_metric_remedy(metric_name: str, file_path: str, *, output_dir: Optional[str] = None, **kwargs) -> str:
+    """Execute `remedy` on a custom metric and save the returned DataFrame as CSV."""
+    script_path = _resolve_custom_script(metric_name)
+    clean_name = os.path.splitext(os.path.basename(script_path))[0]
+
+    if not os.path.exists(script_path):
+        raise FileNotFoundError(f"Custom metric file not found at: {script_path}")
+
+    spec = importlib.util.spec_from_file_location(clean_name, script_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    if not hasattr(module, "CustomDR"):
+        raise AttributeError(f"Class 'CustomDR' not found in {script_path}")
+
+    _log_progress(f"Loading dataset for remedy: {file_path}", kwargs.get("verbose", False))
+    df = pd.read_csv(file_path)
+
+    agent = module.CustomDR(dataset=df, **kwargs)
+    if not hasattr(agent, "remedy"):
+        raise AttributeError("CustomDR must implement a remedy method returning a pandas DataFrame")
+
+    _log_progress(f"Executing remedy for custom metric: {metric_name}", kwargs.get("verbose", False))
+    remedied = agent.remedy(**kwargs)
+
+    if not isinstance(remedied, pd.DataFrame):
+        raise TypeError("remedy() must return a pandas DataFrame")
+
+    target_dir = output_dir or os.path.join(os.path.dirname(script_path), "remedy_data")
+    os.makedirs(target_dir, exist_ok=True)
+    filename = f"{clean_name}_remedy.csv"
+    output_path = os.path.join(target_dir, filename)
+    remedied.to_csv(output_path, index=False)
+
+    return output_path
